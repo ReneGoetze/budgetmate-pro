@@ -14,7 +14,6 @@
   <header class="header">
     <div>
       <h1>BudgetMate Pro</h1>
-      <p class="subtitle">Offline budget tracker (no GPT needed)</p>
     </div>
   </header>
 
@@ -31,11 +30,12 @@
       </div>
       <div class="form-row">
         <label for="category">Category</label>
-        <input id="category" name="category" type="text" placeholder="e.g. Groceries" required>
+        <input id="category" name="category" type="text" list="categoryList" placeholder="e.g. Groceries" required>
+        <datalist id="categoryList"></datalist>
       </div>
       <button type="submit" class="btn-primary">Save expense</button>
     </form>
-    <p class="hint">All data is stored only in this browser (localStorage).</p>
+    <p class="hint">All data (including categories) is stored only in this browser (localStorage).</p>
   </section>
 
   <section>

@@ -24,11 +24,6 @@ body{
   align-items:flex-start;
   margin-bottom:20px;
 }
-.subtitle{
-  color:var(--muted);
-  margin-top:4px;
-  font-size:0.9rem;
-}
 h1{margin:0;font-size:1.8rem;}
 h2{margin-top:24px;font-size:1.2rem;}
 .card{
