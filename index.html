@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>BudgetMate Pro</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="manifest" href="manifest.webmanifest">
+  <meta name="theme-color" content="#0F172A">
+  <link rel="stylesheet" href="style.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+<div class="container">
+  <header class="header">
+    <div>
+      <h1>BudgetMate Pro</h1>
+      <p class="subtitle">Your personal budget dashboard</p>
+    </div>
+    <button id="importBtn" class="btn-primary">Import from GPT</button>
+  </header>
+  <section>
+    <h2>Monthly Spending</h2>
+    <canvas id="monthlyChart"></canvas>
+  </section>
+  <section>
+    <h2>Categories</h2>
+    <canvas id="categoryChart"></canvas>
+  </section>
+  <section>
+    <h2>Trends (6 Months)</h2>
+    <canvas id="trendChart"></canvas>
+  </section>
+</div>
+<script src="app.js"></script>
+<script>
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('service-worker.js');
+}
+</script>
+</body>
+</html>
