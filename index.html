@@ -7,15 +7,35 @@
   <link rel="manifest" href="./manifest.webmanifest">
   <meta name="theme-color" content="#0F172A">
   <link rel="stylesheet" href="./style.css">
+  <!-- Chart.js -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <!-- Tesseract.js for offline-ish OCR (cached after first load) -->
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 </head>
 <body>
 <div class="container">
   <header class="header">
-    <div>
-      <h1>BudgetMate Pro</h1>
-    </div>
+    <div><h1>BudgetMate Pro</h1></div>
+    <button id="darkToggle" class="btn-secondary" type="button">Dark mode</button>
   </header>
+
+  <section class="card">
+    <h2>Budget</h2>
+    <div class="form-row-inline">
+      <div class="form-row">
+        <label for="dailyBudget">Daily budget (€)</label>
+        <input id="dailyBudget" type="number" step="0.01" min="0">
+      </div>
+      <div class="form-row">
+        <label for="monthlyBudget">Monthly budget (€)</label>
+        <input id="monthlyBudget" type="number" step="0.01" min="0">
+      </div>
+      <div class="form-row form-row-button">
+        <button id="saveBudget" class="btn-primary" type="button">Save budget</button>
+      </div>
+    </div>
+    <p id="budgetInfo" class="hint"></p>
+  </section>
 
   <section class="card">
     <h2>Add expense</h2>
@@ -29,13 +49,42 @@
         <input id="amount" name="amount" type="number" step="0.01" min="0" required>
       </div>
       <div class="form-row">
-        <label for="category">Category</label>
-        <input id="category" name="category" type="text" list="categoryList" placeholder="e.g. Groceries" required>
-        <datalist id="categoryList"></datalist>
+        <label>Category</label>
+        <div class="category-row">
+          <input id="category" name="category" type="text" list="categoryList" placeholder="e.g. Groceries" required>
+          <datalist id="categoryList"></datalist>
+        </div>
+        <div class="category-buttons">
+          <button type="button" class="cat-btn" data-cat="Groceries">Groceries</button>
+          <button type="button" class="cat-btn" data-cat="Food">Food</button>
+          <button type="button" class="cat-btn" data-cat="Coffee">Coffee</button>
+          <button type="button" class="cat-btn" data-cat="Transport">Transport</button>
+          <button type="button" class="cat-btn" data-cat="Health">Health</button>
+          <button type="button" class="cat-btn" data-cat="Fun">Fun</button>
+          <button type="button" class="cat-btn" data-cat="Other">Other</button>
+        </div>
       </div>
+      <div class="form-row">
+        <label for="note">Note (optional)</label>
+        <input id="note" name="note" type="text" placeholder="e.g. Supermarket, Lidl, etc.">
+      </div>
+      <div class="form-row">
+        <label for="receipt">Receipt photo (optional)</label>
+        <input id="receipt" name="receipt" type="file" accept="image/*" capture="environment">
+        <p class="hint small">If Tesseract.js is loaded, I’ll try to detect amount & date from the image.</p>
+      </div>
+
+      <div style="height:12px;"></div>
+
       <button type="submit" class="btn-primary">Save expense</button>
     </form>
-    <p class="hint">All data (including categories) is stored only in this browser (localStorage).</p>
+    <p class="hint">All data is stored only in this browser (localStorage).</p>
+  </section>
+
+  <section class="card">
+    <h2>Export</h2>
+    <button id="exportCsv" class="btn-secondary" type="button">Export as CSV</button>
+    <p class="hint small">You can open the CSV in Excel or Numbers and also save/print it as PDF.</p>
   </section>
 
   <section>
@@ -51,6 +100,22 @@
   <section>
     <h2>Trend (last 6 months)</h2>
     <canvas id="trendChart"></canvas>
+  </section>
+
+  <section class="card">
+    <h2>Expenses (current month)</h2>
+    <div id="summaryBar" class="summary-bar"></div>
+    <table id="expenseTable">
+      <thead>
+        <tr>
+          <th>Date</th>
+          <th>Category</th>
+          <th>Amount (€)</th>
+          <th>Note</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
   </section>
 </div>
 
