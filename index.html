@@ -4,9 +4,9 @@
   <meta charset="UTF-8">
   <title>BudgetMate Pro</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="manifest" href="./manifest.webmanifest">
   <meta name="theme-color" content="#0F172A">
-  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="./style.css">
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
@@ -14,27 +14,50 @@
   <header class="header">
     <div>
       <h1>BudgetMate Pro</h1>
-      <p class="subtitle">Your personal budget dashboard</p>
+      <p class="subtitle">Offline budget tracker (no GPT needed)</p>
     </div>
-    <button id="importBtn" class="btn-primary">Import from GPT</button>
   </header>
+
+  <section class="card">
+    <h2>Add expense</h2>
+    <form id="expenseForm">
+      <div class="form-row">
+        <label for="date">Date</label>
+        <input id="date" name="date" type="date" required>
+      </div>
+      <div class="form-row">
+        <label for="amount">Amount (€)</label>
+        <input id="amount" name="amount" type="number" step="0.01" min="0" required>
+      </div>
+      <div class="form-row">
+        <label for="category">Category</label>
+        <input id="category" name="category" type="text" placeholder="e.g. Groceries" required>
+      </div>
+      <button type="submit" class="btn-primary">Save expense</button>
+    </form>
+    <p class="hint">All data is stored only in this browser (localStorage).</p>
+  </section>
+
   <section>
     <h2>Monthly Spending</h2>
     <canvas id="monthlyChart"></canvas>
   </section>
+
   <section>
-    <h2>Categories</h2>
+    <h2>Categories (current month)</h2>
     <canvas id="categoryChart"></canvas>
   </section>
+
   <section>
-    <h2>Trends (6 Months)</h2>
+    <h2>Trend (last 6 months)</h2>
     <canvas id="trendChart"></canvas>
   </section>
 </div>
-<script src="app.js"></script>
+
+<script src="./app.js"></script>
 <script>
 if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('service-worker.js');
+  navigator.serviceWorker.register('./service-worker.js');
 }
 </script>
 </body>
