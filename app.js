@@ -1,14 +1,19 @@
-// Storage keys
+// BudgetMate Pro v6
+
+// === Config ===
 const STORAGE_KEY = 'bm_expenses';
 const CATEGORY_KEY = 'bm_categories';
 const SETTINGS_KEY = 'bm_settings';
+
+// Optional OCR.space API key (if you want to use OCR.space in addition to Tesseract)
+const OCRSPACE_API_KEY = ''; // <- if you get a key from ocr.space, put it here
 
 // Colors
 const COLOR_GREEN = 'rgba(34,197,94,0.8)';  // green-500
 const COLOR_RED   = 'rgba(239,68,68,0.8)';  // red-500
 const COLOR_NEUTRAL = 'rgba(59,130,246,0.5)'; // blue-500
 
-// Load & save helpers
+// === Generic storage helpers ===
 function loadJSON(key, fallback){
   const raw = localStorage.getItem(key);
   if(!raw) return fallback;
@@ -18,7 +23,7 @@ function saveJSON(key, value){
   localStorage.setItem(key, JSON.stringify(value));
 }
 
-// Expenses
+// === Data models ===
 function loadExpenses(){ return loadJSON(STORAGE_KEY, []); }
 function saveExpenses(expenses){ saveJSON(STORAGE_KEY, expenses); }
 
@@ -29,7 +34,8 @@ function loadSettings(){
   return loadJSON(SETTINGS_KEY, {
     dailyBudget: null,
     monthlyBudget: null,
-    darkMode: false
+    darkMode: false,
+    ocrMethod: 'tesseract' // 'tesseract' or 'tesseract_ocrspace'
   });
 }
 function saveSettings(s){ saveJSON(SETTINGS_KEY, s); }
@@ -54,12 +60,13 @@ function deleteExpense(id){
   saveExpenses(expenses);
 }
 
-function clearAllData(){
-  saveExpenses([]);
-  saveCategories([]);
+function clearAllDataAndSettings(){
+  localStorage.removeItem(STORAGE_KEY);
+  localStorage.removeItem(CATEGORY_KEY);
+  localStorage.removeItem(SETTINGS_KEY);
 }
 
-// Helpers
+// === Date helpers ===
 function todayDate(){
   const d = new Date();
   return d.toISOString().slice(0,10);
@@ -80,7 +87,7 @@ function getCurrentWeekRange(){
 }
 
 function filterCurrentMonth(expenses){
-  const monthKey = getCurrentMonthKey(); // YYYY-MM
+  const monthKey = getCurrentMonthKey();
   return expenses.filter(e => (e.date || '').startsWith(monthKey));
 }
 function filterCurrentDay(expenses){
@@ -101,7 +108,7 @@ function buildMonthlyData(expenses){
   const map = {};
   expenses.forEach(e=>{
     if(!e.date) return;
-    const day = e.date.slice(8,10); // DD
+    const day = e.date.slice(8,10);
     map[day] = (map[day] || 0) + Number(e.amount||0);
   });
   const days = Object.keys(map).sort();
@@ -120,7 +127,7 @@ function buildTrendData(expenses){
   const map = {};
   expenses.forEach(e=>{
     if(!e.date) return;
-    const key = e.date.slice(0,7); // YYYY-MM
+    const key = e.date.slice(0,7);
     map[key] = (map[key] || 0) + Number(e.amount||0);
   });
   const keys = Object.keys(map).sort().slice(-6);
@@ -143,6 +150,63 @@ function renderCategoryList(){
     const opt = document.createElement('option');
     opt.value = c;
     dl.appendChild(opt);
+  });
+}
+
+function renderCategoryManager(){
+  const cont = document.getElementById('categoryManager');
+  if(!cont) return;
+  const cats = loadCategories();
+  if(!cats.length){
+    cont.textContent = 'No saved categories yet. They appear here once you use them.';
+    return;
+  }
+  cont.innerHTML = '';
+  cats.forEach(cat=>{
+    const row = document.createElement('div');
+    row.className = 'cat-item';
+    const span = document.createElement('span');
+    span.textContent = cat;
+    const buttons = document.createElement('div');
+    buttons.className = 'cat-item-buttons';
+    const renameBtn = document.createElement('button');
+    renameBtn.textContent = 'Rename';
+    renameBtn.className = 'cat-item-btn';
+    renameBtn.addEventListener('click', ()=>{
+      const neu = prompt('New name for category:', cat);
+      if(!neu) return;
+      const trimmed = neu.trim();
+      if(!trimmed) return;
+      const all = loadCategories();
+      const idx = all.indexOf(cat);
+      if(idx>=0) all[idx] = trimmed;
+      saveCategories(all);
+      // update existing expenses categories
+      const expenses = loadExpenses();
+      expenses.forEach(e=>{
+        if((e.category||'').trim()===cat) e.category = trimmed;
+      });
+      saveExpenses(expenses);
+      renderCategoryList();
+      renderCategoryManager();
+      renderCharts();
+      renderExpenseTable();
+    });
+    const delBtn = document.createElement('button');
+    delBtn.textContent = 'Delete';
+    delBtn.className = 'cat-item-btn';
+    delBtn.addEventListener('click', ()=>{
+      if(!confirm('Delete this category from suggestions? Existing expenses keep their category.')) return;
+      const all = loadCategories().filter(c=>c!==cat);
+      saveCategories(all);
+      renderCategoryList();
+      renderCategoryManager();
+    });
+    buttons.appendChild(renameBtn);
+    buttons.appendChild(delBtn);
+    row.appendChild(span);
+    row.appendChild(buttons);
+    cont.appendChild(row);
   });
 }
 
@@ -173,7 +237,7 @@ function renderCharts(){
   if(catDayChart) catDayChart.destroy();
   if(trendChart) trendChart.destroy();
 
-  // Monthly bar colors: green if <= dailyBudget, red if > dailyBudget
+  // Monthly bars colored by daily budget
   let barColors = m.values.map(()=>COLOR_NEUTRAL);
   if(settings.dailyBudget){
     const db = Number(settings.dailyBudget);
@@ -182,45 +246,27 @@ function renderCharts(){
 
   monthlyChart = new Chart(mCtx, {
     type: 'bar',
-    data: {
-      labels: m.days,
-      datasets: [{
-        label: 'Daily Spending (€)',
-        data: m.values,
-        backgroundColor: barColors
-      }]
-    }
+    data: { labels: m.days, datasets: [{ label: 'Daily Spending (€)', data: m.values, backgroundColor: barColors }] }
   });
 
   catMonthChart = new Chart(cMonthCtx, {
     type: 'doughnut',
-    data: {
-      labels: cMonth.labels,
-      datasets: [{ data: cMonth.values }]
-    }
+    data: { labels: cMonth.labels, datasets: [{ data: cMonth.values }] }
   });
-
   catWeekChart = new Chart(cWeekCtx, {
     type: 'doughnut',
-    data: {
-      labels: cWeek.labels,
-      datasets: [{ data: cWeek.values }]
-    }
+    data: { labels: cWeek.labels, datasets: [{ data: cWeek.values }] }
   });
-
   catDayChart = new Chart(cDayCtx, {
     type: 'doughnut',
-    data: {
-      labels: cDay.labels,
-      datasets: [{ data: cDay.values }]
-    }
+    data: { labels: cDay.labels, datasets: [{ data: cDay.values }] }
   });
 
-  // Trend color: green if current month sum <= budget, else red
+  // Trend line colored by overall month vs budget
   const cmTotal = currentMonthTotal(expenses);
-  let limit = null;
   const today = new Date();
   const daysInMonth = new Date(today.getFullYear(), today.getMonth()+1, 0).getDate();
+  let limit = null;
   if(settings.monthlyBudget){
     limit = Number(settings.monthlyBudget);
   }else if(settings.dailyBudget){
@@ -233,16 +279,7 @@ function renderCharts(){
 
   trendChart = new Chart(tCtx, {
     type: 'line',
-    data: {
-      labels: t.labels,
-      datasets: [{
-        label: 'Monthly Total (€)',
-        data: t.values,
-        borderColor: lineColor,
-        backgroundColor: lineColor,
-        tension: 0.2
-      }]
-    }
+    data: { labels: t.labels, datasets: [{ label: 'Monthly Total (€)', data: t.values, borderColor: lineColor, backgroundColor: lineColor, tension:0.2 }] }
   });
 }
 
@@ -286,7 +323,7 @@ function renderExpenseTable(){
   bar.className = 'summary-bar ' + cls;
 }
 
-// Budget info / remaining
+// Budget info
 function renderBudgetInfo(){
   const info = document.getElementById('budgetInfo');
   if(!info) return;
@@ -320,13 +357,10 @@ function renderBudgetInfo(){
   info.textContent = parts.join(' • ');
 }
 
-// CSV export/import
-function exportCsv(){
+// === CSV export/import ===
+function buildCsvString(){
   const expenses = loadExpenses();
-  if(!expenses.length){
-    alert('No expenses to export.');
-    return;
-  }
+  if(!expenses.length) return '';
   const header = ['date','category','amount','note'];
   const rows = [header.join(',')];
   expenses.forEach(e=>{
@@ -338,15 +372,49 @@ function exportCsv(){
     ].join(',');
     rows.push(line);
   });
-  const blob = new Blob([rows.join('\n')], {type:'text/csv'});
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = 'budgetmate_export.csv';
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
+  return rows.join('\n');
+}
+
+function exportInteractive(){
+  const csv = buildCsvString();
+  if(!csv){
+    alert('No expenses to export.');
+    return;
+  }
+  const choice = prompt('Export options:\\n1 = Download file\\n2 = Copy to clipboard\\n3 = Open in new tab\\n4 = Prepare email\\n\\nEnter 1, 2, 3 or 4:');
+  if(!choice) return;
+  if(choice === '1'){
+    const blob = new Blob([csv], {type:'text/csv'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'budgetmate_export.csv';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }else if(choice === '2'){
+    if(navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(csv).then(()=>{
+        alert('CSV copied to clipboard.');
+      },()=>{
+        alert('Could not copy to clipboard.');
+      });
+    }else{
+      alert('Clipboard API not available. You can copy from a text editor after opening CSV.');
+    }
+  }else if(choice === '3'){
+    const blob = new Blob([csv], {type:'text/csv'});
+    const url = URL.createObjectURL(blob);
+    window.open(url, '_blank');
+    // URL will be revoked when tab is closed, or we could revoke after timeout.
+  }else if(choice === '4'){
+    const mailto = 'mailto:?subject=' + encodeURIComponent('BudgetMate Export') +
+                   '&body=' + encodeURIComponent(csv);
+    window.location.href = mailto;
+  }else{
+    alert('Unknown option.');
+  }
 }
 
 function importCsvFromText(text){
@@ -381,11 +449,11 @@ function importCsvFromText(text){
     newExpenses.push({ id, date, amount, category, note });
   }
 
-  // If we reach here, data is valid -> overwrite
   saveExpenses(newExpenses);
   const cats = [...new Set(newExpenses.map(e=>(e.category||'').trim()).filter(Boolean))];
   saveCategories(cats);
   renderCategoryList();
+  renderCategoryManager();
   renderCharts();
   renderExpenseTable();
   renderBudgetInfo();
@@ -393,61 +461,133 @@ function importCsvFromText(text){
   return true;
 }
 
-// OCR helpers
-async function tryOcrOnReceipt(file){
-  if(!window.Tesseract || !file) return;
+// === OCR helpers ===
+function setOcrStatus(msg){
+  const el = document.getElementById('ocrStatus');
+  if(!el) return;
+  el.textContent = msg || '';
+}
+
+async function ocrSpaceRecognize(file){
+  if(!OCRSPACE_API_KEY){
+    return null;
+  }
   try{
-    const { Tesseract } = window;
-    const result = await Tesseract.recognize(file, 'eng');
-    const text = result.data && result.data.text ? result.data.text : '';
-    if(!text) return;
-
-    const numMatches = text.match(/\d+[\.,]\d{2}/g) || [];
-    let amount = null;
-    if(numMatches.length){
-      amount = numMatches.map(n=>parseFloat(n.replace(',','.'))).sort((a,b)=>b-a)[0];
+    const form = new FormData();
+    form.append('file', file);
+    form.append('apikey', OCRSPACE_API_KEY);
+    form.append('language', 'eng');
+    const res = await fetch('https://api.ocr.space/parse/image', {
+      method:'POST',
+      body: form
+    });
+    const data = await res.json();
+    if(data && data.ParsedResults && data.ParsedResults[0] && data.ParsedResults[0].ParsedText){
+      return data.ParsedResults[0].ParsedText;
     }
+    return null;
+  }catch(e){
+    console.error('OCR.space error', e);
+    return null;
+  }
+}
 
-    let date = null;
-    const dateMatch = text.match(/(\d{2}[\.\/]\d{2}[\.\/]\d{2,4}|\d{4}-\d{2}-\d{2})/);
-    if(dateMatch){
-      const raw = dateMatch[1];
-      if(raw.includes('-')){
-        date = raw;
-      }else{
-        const parts = raw.split(/[\.\/]/);
-        if(parts.length>=2){
-          const d = parts[0].padStart(2,'0');
-          const m = parts[1].padStart(2,'0');
-          let y = new Date().getFullYear();
-          if(parts[2]){
-            let yy = parts[2];
-            if(yy.length===2){
-              const base = 2000;
-              y = base + parseInt(yy,10);
-            }else if(yy.length===4){
-              y = parseInt(yy,10);
-            }
+function parseTextForAmountAndDate(text){
+  if(!text) return {amount:null, date:null};
+  const numMatches = text.match(/\d+[\.,]\d{2}/g) || [];
+  let amount = null;
+  if(numMatches.length){
+    amount = numMatches.map(n=>parseFloat(n.replace(',','.'))).sort((a,b)=>b-a)[0];
+  }
+
+  let date = null;
+  const dateMatch = text.match(/(\d{2}[\.\/]\d{2}[\.\/]\d{2,4}|\d{4}-\d{2}-\d{2})/);
+  if(dateMatch){
+    const raw = dateMatch[1];
+    if(raw.includes('-')){
+      date = raw;
+    }else{
+      const parts = raw.split(/[\.\/]/);
+      if(parts.length>=2){
+        const d = parts[0].padStart(2,'0');
+        const m = parts[1].padStart(2,'0');
+        let y = new Date().getFullYear();
+        if(parts[2]){
+          let yy = parts[2];
+          if(yy.length===2){
+            const base = 2000;
+            y = base + parseInt(yy,10);
+          }else if(yy.length===4){
+            y = parseInt(yy,10);
           }
-          date = `${y}-${m}-${d}`;
         }
+        date = `${y}-${m}-${d}`;
       }
     }
+  }
+  return {amount, date};
+}
 
-    if(amount != null){
-      const amountInput = document.getElementById('amount');
-      if(amountInput) amountInput.value = amount.toFixed(2);
-    }
-    if(date){
-      const dateInput = document.getElementById('date');
-      if(dateInput) dateInput.value = date;
+async function tryOcrOnReceipt(file){
+  if(!file){
+    setOcrStatus('');
+    return;
+  }
+  const settings = loadSettings();
+  const method = settings.ocrMethod || 'tesseract';
+  setOcrStatus('OCR analyzing…');
+  let text = null;
+
+  try{
+    if(method === 'tesseract_ocrspace' && OCRSPACE_API_KEY){
+      text = await ocrSpaceRecognize(file);
+      if(!text){
+        // fallback to Tesseract
+        if(window.Tesseract){
+          const { Tesseract } = window;
+          const result = await Tesseract.recognize(file, 'eng');
+          text = result.data && result.data.text ? result.data.text : '';
+        }
+      }
+    }else{
+      if(window.Tesseract){
+        const { Tesseract } = window;
+        const result = await Tesseract.recognize(file, 'eng');
+        text = result.data && result.data.text ? result.data.text : '';
+      }
     }
   }catch(e){
     console.error('OCR error', e);
   }
+
+  if(!text){
+    setOcrStatus('OCR: no text detected.');
+    return;
+  }
+  const {amount, date} = parseTextForAmountAndDate(text);
+  const updates = [];
+  if(amount != null){
+    const amountInput = document.getElementById('amount');
+    if(amountInput){
+      amountInput.value = amount.toFixed(2);
+      updates.push('amount ' + amount.toFixed(2));
+    }
+  }
+  if(date){
+    const dateInput = document.getElementById('date');
+    if(dateInput){
+      dateInput.value = date;
+      updates.push('date ' + date);
+    }
+  }
+  if(updates.length){
+    setOcrStatus('OCR updated: ' + updates.join(', '));
+  }else{
+    setOcrStatus('OCR finished, but no amount/date found.');
+  }
 }
 
-// Init
+// === Init ===
 document.addEventListener('DOMContentLoaded', () => {
   const form = document.getElementById('expenseForm');
   const dateInput = document.getElementById('date');
@@ -462,11 +602,16 @@ document.addEventListener('DOMContentLoaded', () => {
   const toggle = document.getElementById('darkToggle');
   if(toggle) toggle.textContent = settings.darkMode ? 'Light mode' : 'Dark mode';
 
+  const ocrSelect = document.getElementById('ocrMethod');
+  if(ocrSelect) ocrSelect.value = settings.ocrMethod || 'tesseract';
+
   renderBudgetInfo();
   renderCategoryList();
+  renderCategoryManager();
   renderCharts();
   renderExpenseTable();
 
+  // Category quick buttons
   document.querySelectorAll('.cat-btn').forEach(btn=>{
     btn.addEventListener('click', ()=>{
       const cat = btn.getAttribute('data-cat');
@@ -475,6 +620,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
+  // Dark mode toggle
   if(toggle){
     toggle.addEventListener('click', ()=>{
       const s = loadSettings();
@@ -485,6 +631,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  // Save budget
   const saveBudgetBtn = document.getElementById('saveBudget');
   if(saveBudgetBtn){
     saveBudgetBtn.addEventListener('click', ()=>{
@@ -493,26 +640,49 @@ document.addEventListener('DOMContentLoaded', () => {
       const mVal = document.getElementById('monthlyBudget').value;
       s.dailyBudget = dVal ? parseFloat(dVal) : null;
       s.monthlyBudget = mVal ? parseFloat(mVal) : null;
+      if(ocrSelect) s.ocrMethod = ocrSelect.value || 'tesseract';
       saveSettings(s);
       renderBudgetInfo();
       renderExpenseTable();
       renderCharts();
-      alert('Budget saved.');
+      alert('Budget and rules saved.');
     });
   }
 
-  const exportBtn = document.getElementById('exportCsv');
-  if(exportBtn){
-    exportBtn.addEventListener('click', exportCsv);
+  // OCR method select
+  if(ocrSelect){
+    ocrSelect.addEventListener('change', ()=>{
+      const s = loadSettings();
+      s.ocrMethod = ocrSelect.value || 'tesseract';
+      saveSettings(s);
+    });
   }
 
+  // Export
+  const exportBtn = document.getElementById('exportCsv');
+  if(exportBtn){
+    exportBtn.addEventListener('click', exportInteractive);
+  }
+
+  // Import
   const importBtn = document.getElementById('importCsv');
   const importFile = document.getElementById('importFile');
   if(importBtn && importFile){
     importBtn.addEventListener('click', ()=>{
-      if(!confirm('Do you really want to overwrite all datas?')) return;
-      importFile.value = '';
-      importFile.click();
+      const mode = prompt('Import from:\\n1 = CSV file\\n2 = Paste CSV text\\n\\nEnter 1 or 2:');
+      if(!mode) return;
+      if(mode === '1'){
+        if(!confirm('Do you really want to overwrite all datas?')) return;
+        importFile.value = '';
+        importFile.click();
+      }else if(mode === '2'){
+        if(!confirm('Do you really want to overwrite all datas?')) return;
+        const text = prompt('Paste CSV content here:');
+        if(!text) return;
+        importCsvFromText(text);
+      }else{
+        alert('Unknown option.');
+      }
     });
     importFile.addEventListener('change', ()=>{
       const file = importFile.files && importFile.files[0];
@@ -526,16 +696,20 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  // Receipt OCR
   const receiptInput = document.getElementById('receipt');
   if(receiptInput){
     receiptInput.addEventListener('change', ()=>{
       const file = receiptInput.files && receiptInput.files[0];
       if(file){
         tryOcrOnReceipt(file);
+      }else{
+        setOcrStatus('');
       }
     });
   }
 
+  // Delete single expense via table (event delegation)
   const tbody = document.querySelector('#expenseTable tbody');
   if(tbody){
     tbody.addEventListener('click', (e)=>{
@@ -553,35 +727,46 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  // DELETE ALL (only data, not settings)
   const deleteAllBtn = document.getElementById('deleteAll');
   if(deleteAllBtn){
     deleteAllBtn.addEventListener('click', ()=>{
       if(!confirm('Do you really want to delete ALL data?')) return;
-      clearAllData();
+      saveExpenses([]);
+      saveCategories([]);
       renderCategoryList();
+      renderCategoryManager();
       renderCharts();
       renderExpenseTable();
       renderBudgetInfo();
     });
   }
 
+  // NEW RULES -> scroll to rules section
   const newRulesBtn = document.getElementById('newRules');
   if(newRulesBtn){
     newRulesBtn.addEventListener('click', ()=>{
       if(!confirm('Do you really want to change the rules?')) return;
-      saveSettings({ dailyBudget:null, monthlyBudget:null, darkMode:false });
-      const dIn = document.getElementById('dailyBudget');
-      const mIn = document.getElementById('monthlyBudget');
-      if(dIn) dIn.value = '';
-      if(mIn) mIn.value = '';
-      document.body.classList.remove('dark');
-      const tgl = document.getElementById('darkToggle');
-      if(tgl) tgl.textContent = 'Dark mode';
-      renderBudgetInfo();
-      alert('Rules reset. You can now define new budgets and preferences above.');
+      const rulesCard = document.getElementById('rulesCard');
+      if(rulesCard){
+        rulesCard.scrollIntoView({behavior:'smooth'});
+      }
+      alert('You can now adjust rules, OCR and categories in the "Rules & Settings" section.');
     });
   }
 
+  // RESET (top) -> delete everything
+  const resetAllBtn = document.getElementById('resetAllApp');
+  if(resetAllBtn){
+    resetAllBtn.addEventListener('click', ()=>{
+      if(!confirm('Do you really want to reset ALL data and settings?')) return;
+      clearAllDataAndSettings();
+      // reload page to get a clean state
+      location.reload();
+    });
+  }
+
+  // Form submit
   if(form){
     form.addEventListener('submit', (e)=>{
       e.preventDefault();
@@ -605,8 +790,10 @@ document.addEventListener('DOMContentLoaded', () => {
       dateInput.value = todayDate();
       const receiptInputLocal = document.getElementById('receipt');
       if(receiptInputLocal) receiptInputLocal.value = '';
+      setOcrStatus('');
 
       renderCategoryList();
+      renderCategoryManager();
       renderCharts();
       renderExpenseTable();
       renderBudgetInfo();

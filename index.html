@@ -16,7 +16,10 @@
 <div class="container">
   <header class="header">
     <div><h1>BudgetMate Pro</h1></div>
-    <button id="darkToggle" class="btn-secondary" type="button">Dark mode</button>
+    <div class="header-actions">
+      <button id="resetAllApp" class="btn-danger" type="button">RESET</button>
+      <button id="darkToggle" class="btn-secondary" type="button">Dark mode</button>
+    </div>
   </header>
 
   <section class="card">
@@ -71,7 +74,8 @@
       <div class="form-row">
         <label for="receipt">Receipt photo (optional)</label>
         <input id="receipt" name="receipt" type="file" accept="image/*" capture="environment">
-        <p class="hint small">If Tesseract.js is loaded, I’ll try to detect amount & date from the image.</p>
+        <p class="hint small">If OCR is active, I’ll try to detect amount & date from the image.</p>
+        <p id="ocrStatus" class="hint small"></p>
       </div>
 
       <div style="height:12px;"></div>
@@ -84,11 +88,30 @@
   <section class="card">
     <h2>Export / Import</h2>
     <div class="export-row">
-      <button id="exportCsv" class="btn-secondary" type="button">Export as CSV</button>
-      <button id="importCsv" class="btn-secondary" type="button">Import CSV</button>
+      <button id="exportCsv" class="btn-secondary" type="button">Export</button>
+      <button id="importCsv" class="btn-secondary" type="button">Import</button>
       <input id="importFile" type="file" accept=".csv,text/csv" style="display:none">
     </div>
-    <p class="hint small">Export to edit in Excel, then re-import the CSV. Import will overwrite all existing data only if the format is valid.</p>
+    <p class="hint small">
+      Export options: download file, copy to clipboard, open in new tab, or prepare email.<br>
+      Import options: from file or paste CSV text. Import overwrites all existing data only if format is valid.
+    </p>
+  </section>
+
+  <section class="card" id="rulesCard">
+    <h2>Rules & Settings</h2>
+    <div class="form-row">
+      <label for="ocrMethod">OCR method</label>
+      <select id="ocrMethod">
+        <option value="tesseract">Tesseract only (local)</option>
+        <option value="tesseract_ocrspace">Tesseract + OCR.space (API key required)</option>
+      </select>
+    </div>
+    <p class="hint small">For OCR.space, open app.js and set OCRSPACE_API_KEY with your personal key.</p>
+    <div class="form-row">
+      <label>Saved categories</label>
+      <div id="categoryManager" class="cat-manager"></div>
+    </div>
   </section>
 
   <section>
