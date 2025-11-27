@@ -1,19 +1,15 @@
-// BudgetMate Pro v6
+// BudgetMate Pro v8 - offline marked-area OCR
 
-// === Config ===
 const STORAGE_KEY = 'bm_expenses';
 const CATEGORY_KEY = 'bm_categories';
 const SETTINGS_KEY = 'bm_settings';
 
-// Optional OCR.space API key (if you want to use OCR.space in addition to Tesseract)
-const OCRSPACE_API_KEY = ''; // <- if you get a key from ocr.space, put it here
-
 // Colors
-const COLOR_GREEN = 'rgba(34,197,94,0.8)';  // green-500
-const COLOR_RED   = 'rgba(239,68,68,0.8)';  // red-500
-const COLOR_NEUTRAL = 'rgba(59,130,246,0.5)'; // blue-500
+const COLOR_GREEN = 'rgba(34,197,94,0.8)';
+const COLOR_RED   = 'rgba(239,68,68,0.8)';
+const COLOR_NEUTRAL = 'rgba(59,130,246,0.5)';
 
-// === Generic storage helpers ===
+// Storage helpers
 function loadJSON(key, fallback){
   const raw = localStorage.getItem(key);
   if(!raw) return fallback;
@@ -23,7 +19,7 @@ function saveJSON(key, value){
   localStorage.setItem(key, JSON.stringify(value));
 }
 
-// === Data models ===
+// Data
 function loadExpenses(){ return loadJSON(STORAGE_KEY, []); }
 function saveExpenses(expenses){ saveJSON(STORAGE_KEY, expenses); }
 
@@ -34,8 +30,7 @@ function loadSettings(){
   return loadJSON(SETTINGS_KEY, {
     dailyBudget: null,
     monthlyBudget: null,
-    darkMode: false,
-    ocrMethod: 'tesseract' // 'tesseract' or 'tesseract_ocrspace'
+    darkMode: false
   });
 }
 function saveSettings(s){ saveJSON(SETTINGS_KEY, s); }
@@ -66,7 +61,7 @@ function clearAllDataAndSettings(){
   localStorage.removeItem(SETTINGS_KEY);
 }
 
-// === Date helpers ===
+// Date helpers
 function todayDate(){
   const d = new Date();
   return d.toISOString().slice(0,10);
@@ -77,7 +72,7 @@ function getCurrentMonthKey(){
 }
 function getCurrentWeekRange(){
   const d = new Date();
-  const day = d.getDay(); // 0=Sun
+  const day = d.getDay();
   const diffToMon = (day === 0 ? -6 : 1 - day);
   const monday = new Date(d);
   monday.setDate(d.getDate() + diffToMon);
@@ -85,14 +80,13 @@ function getCurrentWeekRange(){
   sunday.setDate(monday.getDate() + 6);
   return { start: monday, end: sunday };
 }
-
 function filterCurrentMonth(expenses){
-  const monthKey = getCurrentMonthKey();
-  return expenses.filter(e => (e.date || '').startsWith(monthKey));
+  const mk = getCurrentMonthKey();
+  return expenses.filter(e => (e.date || '').startsWith(mk));
 }
 function filterCurrentDay(expenses){
-  const tk = todayDate();
-  return expenses.filter(e => e.date === tk);
+  const t = todayDate();
+  return expenses.filter(e => e.date === t);
 }
 function filterCurrentWeek(expenses){
   const { start, end } = getCurrentWeekRange();
@@ -133,7 +127,6 @@ function buildTrendData(expenses){
   const keys = Object.keys(map).sort().slice(-6);
   return { labels: keys, values: keys.map(k=>map[k]) };
 }
-
 function currentMonthTotal(expenses){
   return filterCurrentMonth(expenses).reduce((s,e)=>s+Number(e.amount||0),0);
 }
@@ -142,7 +135,7 @@ function currentMonthTotal(expenses){
 let monthlyChart, catMonthChart, catWeekChart, catDayChart, trendChart;
 
 function renderCategoryList(){
-  const cats = loadCategories();
+  const cats = loadCategories().slice().sort((a,b)=>a.localeCompare(b));
   const dl = document.getElementById('categoryList');
   if(!dl) return;
   dl.innerHTML = '';
@@ -156,9 +149,9 @@ function renderCategoryList(){
 function renderCategoryManager(){
   const cont = document.getElementById('categoryManager');
   if(!cont) return;
-  const cats = loadCategories();
+  const cats = loadCategories().slice().sort((a,b)=>a.localeCompare(b));
   if(!cats.length){
-    cont.textContent = 'No saved categories yet. They appear here once you use them.';
+    cont.textContent = 'No saved categories yet. They will appear here once you use them.';
     return;
   }
   cont.innerHTML = '';
@@ -181,7 +174,6 @@ function renderCategoryManager(){
       const idx = all.indexOf(cat);
       if(idx>=0) all[idx] = trimmed;
       saveCategories(all);
-      // update existing expenses categories
       const expenses = loadExpenses();
       expenses.forEach(e=>{
         if((e.category||'').trim()===cat) e.category = trimmed;
@@ -212,17 +204,16 @@ function renderCategoryManager(){
 
 function renderCharts(){
   const expenses = loadExpenses();
-  const currentMonthExpenses = filterCurrentMonth(expenses);
-  const currentWeekExpenses = filterCurrentWeek(expenses);
-  const currentDayExpenses = filterCurrentDay(expenses);
+  const cm = filterCurrentMonth(expenses);
+  const cw = filterCurrentWeek(expenses);
+  const cd = filterCurrentDay(expenses);
 
-  const m = buildMonthlyData(currentMonthExpenses);
-  const cMonth = buildCategoryData(currentMonthExpenses);
-  const cWeek = buildCategoryData(currentWeekExpenses);
-  const cDay = buildCategoryData(currentDayExpenses);
+  const m = buildMonthlyData(cm);
+  const cMonth = buildCategoryData(cm);
+  const cWeek = buildCategoryData(cw);
+  const cDay = buildCategoryData(cd);
   const t = buildTrendData(expenses);
-
-  const settings = loadSettings();
+  const s = loadSettings();
 
   const mCtx = document.getElementById('monthlyChart');
   const cMonthCtx = document.getElementById('catMonthChart');
@@ -237,49 +228,42 @@ function renderCharts(){
   if(catDayChart) catDayChart.destroy();
   if(trendChart) trendChart.destroy();
 
-  // Monthly bars colored by daily budget
   let barColors = m.values.map(()=>COLOR_NEUTRAL);
-  if(settings.dailyBudget){
-    const db = Number(settings.dailyBudget);
+  if(s.dailyBudget){
+    const db = Number(s.dailyBudget);
     barColors = m.values.map(v => v <= db ? COLOR_GREEN : COLOR_RED);
   }
 
   monthlyChart = new Chart(mCtx, {
-    type: 'bar',
-    data: { labels: m.days, datasets: [{ label: 'Daily Spending (€)', data: m.values, backgroundColor: barColors }] }
+    type:'bar',
+    data:{ labels:m.days, datasets:[{ label:'Daily Spending (€)', data:m.values, backgroundColor:barColors }] }
   });
 
   catMonthChart = new Chart(cMonthCtx, {
-    type: 'doughnut',
-    data: { labels: cMonth.labels, datasets: [{ data: cMonth.values }] }
+    type:'doughnut',
+    data:{ labels:cMonth.labels, datasets:[{ data:cMonth.values }] }
   });
   catWeekChart = new Chart(cWeekCtx, {
-    type: 'doughnut',
-    data: { labels: cWeek.labels, datasets: [{ data: cWeek.values }] }
+    type:'doughnut',
+    data:{ labels:cWeek.labels, datasets:[{ data:cWeek.values }] }
   });
   catDayChart = new Chart(cDayCtx, {
-    type: 'doughnut',
-    data: { labels: cDay.labels, datasets: [{ data: cDay.values }] }
+    type:'doughnut',
+    data:{ labels:cDay.labels, datasets:[{ data:cDay.values }] }
   });
 
-  // Trend line colored by overall month vs budget
   const cmTotal = currentMonthTotal(expenses);
   const today = new Date();
   const daysInMonth = new Date(today.getFullYear(), today.getMonth()+1, 0).getDate();
   let limit = null;
-  if(settings.monthlyBudget){
-    limit = Number(settings.monthlyBudget);
-  }else if(settings.dailyBudget){
-    limit = Number(settings.dailyBudget) * daysInMonth;
-  }
+  if(s.monthlyBudget) limit = Number(s.monthlyBudget);
+  else if(s.dailyBudget) limit = Number(s.dailyBudget) * daysInMonth;
   let lineColor = COLOR_NEUTRAL;
-  if(limit != null){
-    lineColor = cmTotal <= limit ? COLOR_GREEN : COLOR_RED;
-  }
+  if(limit != null) lineColor = cmTotal <= limit ? COLOR_GREEN : COLOR_RED;
 
   trendChart = new Chart(tCtx, {
-    type: 'line',
-    data: { labels: t.labels, datasets: [{ label: 'Monthly Total (€)', data: t.values, borderColor: lineColor, backgroundColor: lineColor, tension:0.2 }] }
+    type:'line',
+    data:{ labels:t.labels, datasets:[{ label:'Monthly Total (€)', data:t.values, borderColor:lineColor, backgroundColor:lineColor, tension:0.2 }] }
   });
 }
 
@@ -288,8 +272,7 @@ function renderExpenseTable(){
   const tbody = document.querySelector('#expenseTable tbody');
   const bar = document.getElementById('summaryBar');
   if(!tbody || !bar) return;
-
-  const settings = loadSettings();
+  const s = loadSettings();
   const expenses = loadExpenses();
   const current = filterCurrentMonth(expenses);
 
@@ -308,8 +291,8 @@ function renderExpenseTable(){
 
   let txt = `Current month total: ${total.toFixed(2)} €`;
   let cls = 'summary-ok';
-  if(settings.monthlyBudget){
-    const mb = Number(settings.monthlyBudget);
+  if(s.monthlyBudget){
+    const mb = Number(s.monthlyBudget);
     const diff = mb - total;
     if(diff >= 0){
       txt += ` • ${diff.toFixed(2)} € under monthly budget`;
@@ -338,7 +321,6 @@ function renderBudgetInfo(){
 
   let methodText = '';
   let remaining = null;
-
   if(s.monthlyBudget){
     remaining = Number(s.monthlyBudget) - total;
     methodText = 'based on monthly budget';
@@ -357,7 +339,7 @@ function renderBudgetInfo(){
   info.textContent = parts.join(' • ');
 }
 
-// === CSV export/import ===
+// CSV Export/Import
 function buildCsvString(){
   const expenses = loadExpenses();
   if(!expenses.length) return '';
@@ -381,7 +363,7 @@ function exportInteractive(){
     alert('No expenses to export.');
     return;
   }
-  const choice = prompt('Export options:\\n1 = Download file\\n2 = Copy to clipboard\\n3 = Open in new tab\\n4 = Prepare email\\n\\nEnter 1, 2, 3 or 4:');
+  const choice = prompt('Export options:\n1 = Download file\n2 = Copy to clipboard\n3 = Open in new tab\n4 = Prepare email\n\nEnter 1, 2, 3 or 4:');
   if(!choice) return;
   if(choice === '1'){
     const blob = new Blob([csv], {type:'text/csv'});
@@ -395,19 +377,14 @@ function exportInteractive(){
     URL.revokeObjectURL(url);
   }else if(choice === '2'){
     if(navigator.clipboard && navigator.clipboard.writeText){
-      navigator.clipboard.writeText(csv).then(()=>{
-        alert('CSV copied to clipboard.');
-      },()=>{
-        alert('Could not copy to clipboard.');
-      });
+      navigator.clipboard.writeText(csv).then(()=>alert('CSV copied to clipboard.'),()=>alert('Could not copy to clipboard.'));
     }else{
-      alert('Clipboard API not available. You can copy from a text editor after opening CSV.');
+      alert('Clipboard API not available.');
     }
   }else if(choice === '3'){
     const blob = new Blob([csv], {type:'text/csv'});
     const url = URL.createObjectURL(blob);
     window.open(url, '_blank');
-    // URL will be revoked when tab is closed, or we could revoke after timeout.
   }else if(choice === '4'){
     const mailto = 'mailto:?subject=' + encodeURIComponent('BudgetMate Export') +
                    '&body=' + encodeURIComponent(csv);
@@ -439,7 +416,6 @@ function importCsvFromText(text){
     const category = (parts[1] || '').trim();
     const amountStr = (parts[2] || '').trim();
     const note = (parts[3] || '').trim();
-
     const amount = parseFloat(amountStr.replace(',','.'));
     if(!isFinite(amount)){
       alert('Invalid amount in line ' + (i+1));
@@ -448,7 +424,6 @@ function importCsvFromText(text){
     const id = Date.now() + Math.random();
     newExpenses.push({ id, date, amount, category, note });
   }
-
   saveExpenses(newExpenses);
   const cats = [...new Set(newExpenses.map(e=>(e.category||'').trim()).filter(Boolean))];
   saveCategories(cats);
@@ -461,149 +436,258 @@ function importCsvFromText(text){
   return true;
 }
 
-// === OCR helpers ===
+// OCR helpers (marked area on canvas)
+let ocrImage = null;
+let ocrCanvas, ocrCtx;
+let ocrScale = 1;
+let ocrMode = null; // 'amount' or 'date'
+let isDrawing = false;
+let startX = 0, startY = 0;
+let amountRect = null;
+let dateRect = null;
+
 function setOcrStatus(msg){
   const el = document.getElementById('ocrStatus');
   if(!el) return;
   el.textContent = msg || '';
 }
 
-async function ocrSpaceRecognize(file){
-  if(!OCRSPACE_API_KEY){
-    return null;
+function drawOcrCanvas(){
+  if(!ocrCanvas || !ocrCtx || !ocrImage) return;
+  const w = ocrCanvas.width;
+  const h = ocrCanvas.height;
+  ocrCtx.clearRect(0,0,w,h);
+  ocrCtx.drawImage(ocrImage, 0,0,w,h);
+  ocrCtx.lineWidth = 3;
+  if(amountRect){
+    const r = normalizeRect(amountRect);
+    ocrCtx.strokeStyle = 'rgba(34,197,94,0.95)';
+    ocrCtx.fillStyle = 'rgba(34,197,94,0.12)';
+    ocrCtx.strokeRect(r.x, r.y, r.w, r.h);
+    ocrCtx.fillRect(r.x, r.y, r.w, r.h);
   }
-  try{
-    const form = new FormData();
-    form.append('file', file);
-    form.append('apikey', OCRSPACE_API_KEY);
-    form.append('language', 'eng');
-    const res = await fetch('https://api.ocr.space/parse/image', {
-      method:'POST',
-      body: form
-    });
-    const data = await res.json();
-    if(data && data.ParsedResults && data.ParsedResults[0] && data.ParsedResults[0].ParsedText){
-      return data.ParsedResults[0].ParsedText;
-    }
-    return null;
-  }catch(e){
-    console.error('OCR.space error', e);
-    return null;
+  if(dateRect){
+    const r = normalizeRect(dateRect);
+    ocrCtx.strokeStyle = 'rgba(59,130,246,0.95)';
+    ocrCtx.fillStyle = 'rgba(59,130,246,0.12)';
+    ocrCtx.strokeRect(r.x, r.y, r.w, r.h);
+    ocrCtx.fillRect(r.x, r.y, r.w, r.h);
   }
 }
 
-function parseTextForAmountAndDate(text){
-  if(!text) return {amount:null, date:null};
-  const numMatches = text.match(/\d+[\.,]\d{2}/g) || [];
-  let amount = null;
-  if(numMatches.length){
-    amount = numMatches.map(n=>parseFloat(n.replace(',','.'))).sort((a,b)=>b-a)[0];
-  }
+function initOcrCanvas(file){
+  const tools = document.getElementById('receiptTools');
+  const canvas = document.getElementById('receiptCanvas');
+  if(!canvas || !tools) return;
+  ocrCanvas = canvas;
+  ocrCtx = canvas.getContext('2d');
+  amountRect = null;
+  dateRect = null;
+  ocrImage = new Image();
+  const reader = new FileReader();
+  reader.onload = e => {
+    ocrImage.onload = ()=>{
+      const maxWidth = canvas.parentElement.clientWidth || 320;
+      const ratio = ocrImage.width/ocrImage.height;
+      const cw = Math.min(maxWidth, ocrImage.width);
+      const ch = cw/ratio;
+      canvas.width = cw;
+      canvas.height = ch;
+      ocrScale = ocrImage.width / cw;
+      drawOcrCanvas();
+      tools.style.display = 'block';
+      setOcrStatus('Image loaded. Mark amount area, then date area.');
+    };
+    ocrImage.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
 
+function attachOcrCanvasEvents(){
+  const canvas = document.getElementById('receiptCanvas');
+  if(!canvas) return;
+  canvas.addEventListener('mousedown', e=>{
+    if(!ocrMode) return;
+    const rect = canvas.getBoundingClientRect();
+    startX = e.clientX - rect.left;
+    startY = e.clientY - rect.top;
+    isDrawing = true;
+  });
+  canvas.addEventListener('mousemove', e=>{
+    if(!isDrawing || !ocrMode) return;
+    const rect = canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    const w = x - startX;
+    const h = y - startY;
+    if(ocrMode === 'amount'){
+      amountRect = {x:startX, y:startY, w, h};
+    }else if(ocrMode === 'date'){
+      dateRect = {x:startX, y:startY, w, h};
+    }
+    drawOcrCanvas();
+  });
+  canvas.addEventListener('touchstart', e=>{
+    if(!ocrMode) return;
+    const rect = canvas.getBoundingClientRect();
+    const t = e.touches[0];
+    startX = t.clientX - rect.left;
+    startY = t.clientY - rect.top;
+    isDrawing = true;
+  }, {passive:true});
+  canvas.addEventListener('touchmove', e=>{
+    if(!isDrawing || !ocrMode) return;
+    const rect = canvas.getBoundingClientRect();
+    const t = e.touches[0];
+    const x = t.clientX - rect.left;
+    const y = t.clientY - rect.top;
+    const w = x - startX;
+    const h = y - startY;
+    if(ocrMode === 'amount'){
+      amountRect = {x:startX, y:startY, w, h};
+    }else if(ocrMode === 'date'){
+      dateRect = {x:startX, y:startY, w, h};
+    }
+    drawOcrCanvas();
+  }, {passive:true});
+  window.addEventListener('mouseup', ()=>{
+    if(isDrawing){
+      isDrawing = false;
+      if(ocrMode === 'amount' && amountRect){
+        setOcrStatus('Amount area marked. Now mark date area or run OCR.');
+      }
+      if(ocrMode === 'date' && dateRect){
+        setOcrStatus('Date area marked. You can now run OCR.');
+      }
+    }
+  });
+  window.addEventListener('touchend', ()=>{
+    if(isDrawing){
+      isDrawing = false;
+      if(ocrMode === 'amount' && amountRect){
+        setOcrStatus('Amount area marked. Now mark date area or run OCR.');
+      }
+      if(ocrMode === 'date' && dateRect){
+        setOcrStatus('Date area marked. You can now run OCR.');
+      }
+    }
+  });
+}
+
+function normalizeRect(r){
+  if(!r) return null;
+  let {x,y,w,h} = r;
+  if(w<0){ x = x+w; w = -w; }
+  if(h<0){ y = y+h; h = -h; }
+  return {x,y,w,h};
+}
+
+function parseAmountAndDate(text){
+  if(!text) return {amount:null,date:null};
+  const nums = text.match(/\d+[\.,]\d{2}/g) || [];
+  let amount = null;
+  if(nums.length){
+    amount = nums.map(n=>parseFloat(n.replace(',','.'))).sort((a,b)=>b-a)[0];
+  }
   let date = null;
-  const dateMatch = text.match(/(\d{2}[\.\/]\d{2}[\.\/]\d{2,4}|\d{4}-\d{2}-\d{2})/);
-  if(dateMatch){
-    const raw = dateMatch[1];
-    if(raw.includes('-')){
+  const match = text.match(/(\d{2}[\.\/-]\d{2}[\.\/-]\d{2,4}|\d{4}-\d{2}-\d{2})/);
+  if(match){
+    const raw = match[1];
+    if(raw.includes('-') && raw.indexOf('-')===4){
       date = raw;
     }else{
-      const parts = raw.split(/[\.\/]/);
-      if(parts.length>=2){
-        const d = parts[0].padStart(2,'0');
-        const m = parts[1].padStart(2,'0');
-        let y = new Date().getFullYear();
-        if(parts[2]){
-          let yy = parts[2];
-          if(yy.length===2){
-            const base = 2000;
-            y = base + parseInt(yy,10);
-          }else if(yy.length===4){
-            y = parseInt(yy,10);
-          }
-        }
-        date = `${y}-${m}-${d}`;
+      const parts = raw.split(/[\.\/-]/);
+      const d = parts[0].padStart(2,'0');
+      const m = parts[1].padStart(2,'0');
+      let y = new Date().getFullYear();
+      if(parts[2]){
+        let yy = parts[2];
+        if(yy.length===2) y = 2000 + parseInt(yy,10);
+        else if(yy.length===4) y = parseInt(yy,10);
       }
+      date = `${y}-${m}-${d}`;
     }
   }
-  return {amount, date};
+  return {amount,date};
 }
 
-async function tryOcrOnReceipt(file){
-  if(!file){
-    setOcrStatus('');
+async function runOcrOnSelection(){
+  if(!ocrCanvas || !ocrCtx || !ocrImage){
+    setOcrStatus('No image loaded.');
     return;
   }
-  const settings = loadSettings();
-  const method = settings.ocrMethod || 'tesseract';
-  setOcrStatus('OCR analyzing…');
-  let text = null;
-
-  try{
-    if(method === 'tesseract_ocrspace' && OCRSPACE_API_KEY){
-      text = await ocrSpaceRecognize(file);
-      if(!text){
-        // fallback to Tesseract
-        if(window.Tesseract){
-          const { Tesseract } = window;
-          const result = await Tesseract.recognize(file, 'eng');
-          text = result.data && result.data.text ? result.data.text : '';
+  if(!window.Tesseract){
+    setOcrStatus('Tesseract not available. Please open the app once with internet to load OCR.');
+    return;
+  }
+  const rects = [];
+  const normAmount = normalizeRect(amountRect);
+  const normDate = normalizeRect(dateRect);
+  if(normAmount) rects.push({name:'amount', rect:normAmount});
+  if(normDate) rects.push({name:'date', rect:normDate});
+  if(!rects.length){
+    setOcrStatus('No areas marked. Please mark amount and/or date area first.');
+    return;
+  }
+  setOcrStatus('OCR analyzing selected areas…');
+  const {Tesseract} = window;
+  const updates = [];
+  for(const r of rects){
+    const off = document.createElement('canvas');
+    off.width = r.rect.w;
+    off.height = r.rect.h;
+    const offCtx = off.getContext('2d');
+    const sx = r.rect.x * ocrScale;
+    const sy = r.rect.y * ocrScale;
+    const sw = r.rect.w * ocrScale;
+    const sh = r.rect.h * ocrScale;
+    offCtx.drawImage(ocrImage, sx, sy, sw, sh, 0,0,off.width,off.height);
+    const blob = await new Promise(res=>off.toBlob(res,'image/png'));
+    if(!blob) continue;
+    try{
+      const result = await Tesseract.recognize(blob,'eng');
+      const text = result.data && result.data.text ? result.data.text : '';
+      if(!text) continue;
+      const {amount,date} = parseAmountAndDate(text);
+      if(r.name==='amount' && amount!=null){
+        const amtInput = document.getElementById('amount');
+        if(amtInput){
+          amtInput.value = amount.toFixed(2);
+          updates.push(`amount ${amount.toFixed(2)}`);
         }
       }
-    }else{
-      if(window.Tesseract){
-        const { Tesseract } = window;
-        const result = await Tesseract.recognize(file, 'eng');
-        text = result.data && result.data.text ? result.data.text : '';
+      if(r.name==='date' && date){
+        const dateInput = document.getElementById('date');
+        if(dateInput){
+          dateInput.value = date;
+          updates.push(`date ${date}`);
+        }
       }
-    }
-  }catch(e){
-    console.error('OCR error', e);
-  }
-
-  if(!text){
-    setOcrStatus('OCR: no text detected.');
-    return;
-  }
-  const {amount, date} = parseTextForAmountAndDate(text);
-  const updates = [];
-  if(amount != null){
-    const amountInput = document.getElementById('amount');
-    if(amountInput){
-      amountInput.value = amount.toFixed(2);
-      updates.push('amount ' + amount.toFixed(2));
-    }
-  }
-  if(date){
-    const dateInput = document.getElementById('date');
-    if(dateInput){
-      dateInput.value = date;
-      updates.push('date ' + date);
+    }catch(e){
+      console.error('OCR error', e);
     }
   }
   if(updates.length){
     setOcrStatus('OCR updated: ' + updates.join(', '));
   }else{
-    setOcrStatus('OCR finished, but no amount/date found.');
+    setOcrStatus('OCR finished, but no amount/date found in marked areas.');
   }
 }
 
-// === Init ===
+// Init
 document.addEventListener('DOMContentLoaded', () => {
   const form = document.getElementById('expenseForm');
   const dateInput = document.getElementById('date');
   if(dateInput) dateInput.value = todayDate();
 
-  const settings = loadSettings();
-  document.body.classList.toggle('dark', !!settings.darkMode);
+  const s = loadSettings();
+  document.body.classList.toggle('dark', !!s.darkMode);
   const dailyInput = document.getElementById('dailyBudget');
   const monthlyInput = document.getElementById('monthlyBudget');
-  if(dailyInput) dailyInput.value = settings.dailyBudget != null ? settings.dailyBudget : '';
-  if(monthlyInput) monthlyInput.value = settings.monthlyBudget != null ? settings.monthlyBudget : '';
+  if(dailyInput) dailyInput.value = s.dailyBudget != null ? s.dailyBudget : '';
+  if(monthlyInput) monthlyInput.value = s.monthlyBudget != null ? s.monthlyBudget : '';
   const toggle = document.getElementById('darkToggle');
-  if(toggle) toggle.textContent = settings.darkMode ? 'Light mode' : 'Dark mode';
-
-  const ocrSelect = document.getElementById('ocrMethod');
-  if(ocrSelect) ocrSelect.value = settings.ocrMethod || 'tesseract';
+  if(toggle) toggle.textContent = s.darkMode ? 'Light mode' : 'Dark mode';
 
   renderBudgetInfo();
   renderCategoryList();
@@ -611,7 +695,6 @@ document.addEventListener('DOMContentLoaded', () => {
   renderCharts();
   renderExpenseTable();
 
-  // Category quick buttons
   document.querySelectorAll('.cat-btn').forEach(btn=>{
     btn.addEventListener('click', ()=>{
       const cat = btn.getAttribute('data-cat');
@@ -620,56 +703,42 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
-  // Dark mode toggle
   if(toggle){
     toggle.addEventListener('click', ()=>{
-      const s = loadSettings();
-      s.darkMode = !s.darkMode;
-      saveSettings(s);
-      document.body.classList.toggle('dark', !!s.darkMode);
-      toggle.textContent = s.darkMode ? 'Light mode' : 'Dark mode';
+      const s2 = loadSettings();
+      s2.darkMode = !s2.darkMode;
+      saveSettings(s2);
+      document.body.classList.toggle('dark', !!s2.darkMode);
+      toggle.textContent = s2.darkMode ? 'Light mode' : 'Dark mode';
     });
   }
 
-  // Save budget
   const saveBudgetBtn = document.getElementById('saveBudget');
   if(saveBudgetBtn){
     saveBudgetBtn.addEventListener('click', ()=>{
-      const s = loadSettings();
+      const s2 = loadSettings();
       const dVal = document.getElementById('dailyBudget').value;
       const mVal = document.getElementById('monthlyBudget').value;
-      s.dailyBudget = dVal ? parseFloat(dVal) : null;
-      s.monthlyBudget = mVal ? parseFloat(mVal) : null;
-      if(ocrSelect) s.ocrMethod = ocrSelect.value || 'tesseract';
-      saveSettings(s);
+      s2.dailyBudget = dVal ? parseFloat(dVal) : null;
+      s2.monthlyBudget = mVal ? parseFloat(mVal) : null;
+      saveSettings(s2);
       renderBudgetInfo();
       renderExpenseTable();
       renderCharts();
-      alert('Budget and rules saved.');
+      alert('Budget saved.');
     });
   }
 
-  // OCR method select
-  if(ocrSelect){
-    ocrSelect.addEventListener('change', ()=>{
-      const s = loadSettings();
-      s.ocrMethod = ocrSelect.value || 'tesseract';
-      saveSettings(s);
-    });
-  }
-
-  // Export
   const exportBtn = document.getElementById('exportCsv');
   if(exportBtn){
     exportBtn.addEventListener('click', exportInteractive);
   }
 
-  // Import
   const importBtn = document.getElementById('importCsv');
   const importFile = document.getElementById('importFile');
   if(importBtn && importFile){
     importBtn.addEventListener('click', ()=>{
-      const mode = prompt('Import from:\\n1 = CSV file\\n2 = Paste CSV text\\n\\nEnter 1 or 2:');
+      const mode = prompt('Import from:\n1 = CSV file\n2 = Paste CSV text\n\nEnter 1 or 2:');
       if(!mode) return;
       if(mode === '1'){
         if(!confirm('Do you really want to overwrite all datas?')) return;
@@ -688,36 +757,64 @@ document.addEventListener('DOMContentLoaded', () => {
       const file = importFile.files && importFile.files[0];
       if(!file) return;
       const reader = new FileReader();
-      reader.onload = e => {
-        const text = e.target.result;
-        importCsvFromText(text);
-      };
+      reader.onload = e => importCsvFromText(e.target.result);
       reader.readAsText(file);
     });
   }
 
-  // Receipt OCR
   const receiptInput = document.getElementById('receipt');
   if(receiptInput){
     receiptInput.addEventListener('change', ()=>{
       const file = receiptInput.files && receiptInput.files[0];
       if(file){
-        tryOcrOnReceipt(file);
+        initOcrCanvas(file);
       }else{
         setOcrStatus('');
       }
     });
   }
+  attachOcrCanvasEvents();
 
-  // Delete single expense via table (event delegation)
+  const markAmountBtn = document.getElementById('markAmount');
+  const markDateBtn = document.getElementById('markDate');
+  const clearMarksBtn = document.getElementById('clearMarks');
+  const runOcrBtn = document.getElementById('runOcr');
+  if(markAmountBtn){
+    markAmountBtn.addEventListener('click', ()=>{
+      ocrMode = 'amount';
+      setOcrStatus('Mark the AMOUNT area by dragging with mouse or finger.');
+    });
+  }
+  if(markDateBtn){
+    markDateBtn.addEventListener('click', ()=>{
+      ocrMode = 'date';
+      setOcrStatus('Mark the DATE area by dragging with mouse or finger.');
+    });
+  }
+  if(clearMarksBtn){
+    clearMarksBtn.addEventListener('click', ()=>{
+      amountRect = null;
+      dateRect = null;
+      ocrMode = null;
+      drawOcrCanvas();
+      setOcrStatus('Marks cleared. Select amount/date area again if needed.');
+    });
+  }
+  if(runOcrBtn){
+    runOcrBtn.addEventListener('click', ()=>{
+      runOcrOnSelection();
+    });
+  }
+
   const tbody = document.querySelector('#expenseTable tbody');
   if(tbody){
-    tbody.addEventListener('click', (e)=>{
+    tbody.addEventListener('click', e=>{
       const target = e.target;
       if(target && target.classList.contains('del-btn')){
         const idStr = target.getAttribute('data-id');
         if(!idStr) return;
-        if(!confirm('Do you really want to delete?')) return;
+        const msg = 'Do you really want to delete?\n\nYes = delete this single expense.\nNo = keep it.';
+        if(!confirm(msg)) return;
         const idNum = Number(idStr);
         deleteExpense(idNum);
         renderCharts();
@@ -727,11 +824,11 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // DELETE ALL (only data, not settings)
   const deleteAllBtn = document.getElementById('deleteAll');
   if(deleteAllBtn){
     deleteAllBtn.addEventListener('click', ()=>{
-      if(!confirm('Do you really want to delete ALL data?')) return;
+      const msg = 'DELETE ALL EXPENSE DATA\n\nThis will delete:\n• all saved expenses\n• all saved categories\n\nRules & settings will stay.\n\nAre you sure?\nYes = delete all\nNo = cancel';
+      if(!confirm(msg)) return;
       saveExpenses([]);
       saveCategories([]);
       renderCategoryList();
@@ -742,39 +839,33 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // NEW RULES -> scroll to rules section
   const newRulesBtn = document.getElementById('newRules');
   if(newRulesBtn){
     newRulesBtn.addEventListener('click', ()=>{
       if(!confirm('Do you really want to change the rules?')) return;
       const rulesCard = document.getElementById('rulesCard');
-      if(rulesCard){
-        rulesCard.scrollIntoView({behavior:'smooth'});
-      }
-      alert('You can now adjust rules, OCR and categories in the "Rules & Settings" section.');
+      if(rulesCard) rulesCard.scrollIntoView({behavior:'smooth'});
+      alert('You can now adjust categories in the "Rules & Settings" section. Budgets can be changed in the Budget section at the top.');
     });
   }
 
-  // RESET (top) -> delete everything
   const resetAllBtn = document.getElementById('resetAllApp');
   if(resetAllBtn){
     resetAllBtn.addEventListener('click', ()=>{
-      if(!confirm('Do you really want to reset ALL data and settings?')) return;
+      const msg = 'RESET ALL DATA & RULES\n\nThis will delete:\n• all expenses\n• all categories\n• all budgets\n• dark mode setting\n\nThe app will return to its initial state.\n\nAre you sure?\nYes = reset everything\nNo = cancel';
+      if(!confirm(msg)) return;
       clearAllDataAndSettings();
-      // reload page to get a clean state
       location.reload();
     });
   }
 
-  // Form submit
   if(form){
-    form.addEventListener('submit', (e)=>{
+    form.addEventListener('submit', e=>{
       e.preventDefault();
       const date = dateInput.value;
       const amountVal = document.getElementById('amount').value;
       const category = document.getElementById('category').value;
       const note = document.getElementById('note').value;
-
       if(!date || !amountVal || !category){
         alert('Please fill in date, amount and category.');
         return;
@@ -784,14 +875,12 @@ document.addEventListener('DOMContentLoaded', () => {
         alert('Amount must be a positive number.');
         return;
       }
-
       addExpense(date, amount, category, note);
       form.reset();
       dateInput.value = todayDate();
       const receiptInputLocal = document.getElementById('receipt');
       if(receiptInputLocal) receiptInputLocal.value = '';
       setOcrStatus('');
-
       renderCategoryList();
       renderCategoryManager();
       renderCharts();

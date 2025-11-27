@@ -15,7 +15,7 @@
 <body>
 <div class="container">
   <header class="header">
-    <div><h1>BudgetMate Pro</h1></div>
+    <div><h1>BudgetMate Pro v8</h1></div>
     <div class="header-actions">
       <button id="resetAllApp" class="btn-danger" type="button">RESET</button>
       <button id="darkToggle" class="btn-secondary" type="button">Dark mode</button>
@@ -74,8 +74,19 @@
       <div class="form-row">
         <label for="receipt">Receipt photo (optional)</label>
         <input id="receipt" name="receipt" type="file" accept="image/*" capture="environment">
-        <p class="hint small">If OCR is active, I’ll try to detect amount & date from the image.</p>
-        <p id="ocrStatus" class="hint small"></p>
+        <p class="hint small">Step 1: choose a photo. Step 2: mark amount & date areas with your finger. Step 3: run OCR.</p>
+        <div id="receiptTools" class="receipt-tools" style="display:none;">
+          <div class="receipt-buttons">
+            <button type="button" id="markAmount" class="btn-secondary">Mark amount area</button>
+            <button type="button" id="markDate" class="btn-secondary">Mark date area</button>
+            <button type="button" id="clearMarks" class="btn-secondary">Clear marks</button>
+            <button type="button" id="runOcr" class="btn-primary">Run OCR on selection</button>
+          </div>
+          <p id="ocrStatus" class="hint small ocr-status"></p>
+          <div class="receipt-canvas-wrapper">
+            <canvas id="receiptCanvas"></canvas>
+          </div>
+        </div>
       </div>
 
       <div style="height:12px;"></div>
@@ -100,14 +111,6 @@
 
   <section class="card" id="rulesCard">
     <h2>Rules & Settings</h2>
-    <div class="form-row">
-      <label for="ocrMethod">OCR method</label>
-      <select id="ocrMethod">
-        <option value="tesseract">Tesseract only (local)</option>
-        <option value="tesseract_ocrspace">Tesseract + OCR.space (API key required)</option>
-      </select>
-    </div>
-    <p class="hint small">For OCR.space, open app.js and set OCRSPACE_API_KEY with your personal key.</p>
     <div class="form-row">
       <label>Saved categories</label>
       <div id="categoryManager" class="cat-manager"></div>
