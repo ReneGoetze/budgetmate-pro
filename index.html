@@ -9,7 +9,7 @@
   <link rel="stylesheet" href="./style.css">
   <!-- Chart.js -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <!-- Tesseract.js for offline-ish OCR (cached after first load) -->
+  <!-- Tesseract.js for OCR -->
   <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 </head>
 <body>
@@ -82,9 +82,13 @@
   </section>
 
   <section class="card">
-    <h2>Export</h2>
-    <button id="exportCsv" class="btn-secondary" type="button">Export as CSV</button>
-    <p class="hint small">You can open the CSV in Excel or Numbers and also save/print it as PDF.</p>
+    <h2>Export / Import</h2>
+    <div class="export-row">
+      <button id="exportCsv" class="btn-secondary" type="button">Export as CSV</button>
+      <button id="importCsv" class="btn-secondary" type="button">Import CSV</button>
+      <input id="importFile" type="file" accept=".csv,text/csv" style="display:none">
+    </div>
+    <p class="hint small">Export to edit in Excel, then re-import the CSV. Import will overwrite all existing data only if the format is valid.</p>
   </section>
 
   <section>
@@ -93,8 +97,21 @@
   </section>
 
   <section>
-    <h2>Categories (current month)</h2>
-    <canvas id="categoryChart"></canvas>
+    <h2>Categories</h2>
+    <div class="cat-charts">
+      <div class="cat-chart">
+        <h3>Month</h3>
+        <canvas id="catMonthChart"></canvas>
+      </div>
+      <div class="cat-chart">
+        <h3>Week</h3>
+        <canvas id="catWeekChart"></canvas>
+      </div>
+      <div class="cat-chart">
+        <h3>Day</h3>
+        <canvas id="catDayChart"></canvas>
+      </div>
+    </div>
   </section>
 
   <section>
@@ -111,11 +128,15 @@
           <th>Date</th>
           <th>Category</th>
           <th>Amount (€)</th>
-          <th>Note</th>
+          <th>Del</th>
         </tr>
       </thead>
       <tbody></tbody>
     </table>
+    <div class="table-actions">
+      <button id="deleteAll" class="btn-danger" type="button">DELETE ALL</button>
+      <button id="newRules" class="btn-secondary" type="button">NEW RULES</button>
+    </div>
   </section>
 </div>
 

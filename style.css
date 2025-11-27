@@ -24,6 +24,7 @@ body{
 .header{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;}
 h1{margin:0;font-size:1.8rem;}
 h2{margin-top:24px;font-size:1.2rem;}
+h3{margin:6px 0;font-size:0.9rem;}
 .card{
   background:var(--card);
   padding:16px;
@@ -44,10 +45,8 @@ input{
   background:var(--card);
   color:var(--primary);
 }
-input[type="file"]{
-  padding:4px;
-}
-.btn-primary,.btn-secondary{
+input[type="file"]{padding:4px;}
+.btn-primary,.btn-secondary,.btn-danger{
   border:none;
   border-radius:999px;
   padding:8px 16px;
@@ -62,6 +61,10 @@ input[type="file"]{
   background:transparent;
   color:var(--secondary);
   border:1px solid var(--secondary);
+}
+.btn-danger{
+  background:#EF4444;
+  color:#fff;
 }
 canvas{
   background:var(--card);
@@ -97,6 +100,11 @@ body.dark .cat-btn{
 }
 .category-row{display:flex;gap:8px;}
 .category-row input{flex:1;}
+.export-row{
+  display:flex;
+  flex-wrap:wrap;
+  gap:8px;
+}
 #expenseTable{
   width:100%;
   border-collapse:collapse;
@@ -111,9 +119,38 @@ body.dark #expenseTable th,body.dark #expenseTable td{
   border-color:#1F2937;
 }
 #expenseTable th{text-align:left;font-weight:600;}
+.del-btn{
+  border:none;
+  border-radius:999px;
+  padding:4px 10px;
+  font-size:0.8rem;
+  cursor:pointer;
+  background:#FCA5A5;
+  color:#7F1D1D;
+}
+body.dark .del-btn{
+  background:#7F1D1D;
+  color:#FCA5A5;
+}
+.table-actions{
+  display:flex;
+  gap:8px;
+  margin-top:10px;
+}
 .summary-bar{
   font-size:0.85rem;
   margin-bottom:6px;
 }
 .summary-ok{color:#16A34A;}
 .summary-warn{color:#F97316;}
+.cat-charts{
+  display:flex;
+  flex-wrap:wrap;
+  gap:10px;
+}
+.cat-chart{
+  flex:1 1 150px;
+}
+.cat-chart canvas{
+  padding:8px;
+}
