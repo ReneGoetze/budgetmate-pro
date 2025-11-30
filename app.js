@@ -1,15 +1,22 @@
-// BudgetMate Pro v8 - offline marked-area OCR
+// BudgetMate Pro v12 - Filters popup + PDF export + CSV/PDF import + camera OCR
+// IMPORTANT: set your PDF backend URL here (Node server):
+// e.g. const PDF_WORKER_URL = 'https://budgetmate-pdf.onrender.com/pdf-to-csv';
+const PDF_WORKER_URL = 'https://budgetmate-pdf.YOUR_BACKEND_HOST/pdf-to-csv';
 
 const STORAGE_KEY = 'bm_expenses';
 const CATEGORY_KEY = 'bm_categories';
 const SETTINGS_KEY = 'bm_settings';
 
-// Colors
 const COLOR_GREEN = 'rgba(34,197,94,0.8)';
 const COLOR_RED   = 'rgba(239,68,68,0.8)';
 const COLOR_NEUTRAL = 'rgba(59,130,246,0.5)';
 
-// Storage helpers
+// Current filter: period + category
+let currentFilter = {
+  period: 'all',   // 'all' | 'day' | 'week' | 'month'
+  category: 'all'  // 'all' | category name
+};
+
 function loadJSON(key, fallback){
   const raw = localStorage.getItem(key);
   if(!raw) return fallback;
@@ -19,7 +26,6 @@ function saveJSON(key, value){
   localStorage.setItem(key, JSON.stringify(value));
 }
 
-// Data
 function loadExpenses(){ return loadJSON(STORAGE_KEY, []); }
 function saveExpenses(expenses){ saveJSON(STORAGE_KEY, expenses); }
 
@@ -55,13 +61,6 @@ function deleteExpense(id){
   saveExpenses(expenses);
 }
 
-function clearAllDataAndSettings(){
-  localStorage.removeItem(STORAGE_KEY);
-  localStorage.removeItem(CATEGORY_KEY);
-  localStorage.removeItem(SETTINGS_KEY);
-}
-
-// Date helpers
 function todayDate(){
   const d = new Date();
   return d.toISOString().slice(0,10);
@@ -97,7 +96,34 @@ function filterCurrentWeek(expenses){
   });
 }
 
-// Aggregations
+// Apply currentFilter to all expenses
+function getFilteredExpenses(){
+  let expenses = loadExpenses();
+
+  // Period filter
+  switch(currentFilter.period){
+    case 'day':
+      expenses = filterCurrentDay(expenses);
+      break;
+    case 'week':
+      expenses = filterCurrentWeek(expenses);
+      break;
+    case 'month':
+      expenses = filterCurrentMonth(expenses);
+      break;
+    case 'all':
+    default:
+      break;
+  }
+
+  // Category filter
+  if(currentFilter.category !== 'all'){
+    const cat = currentFilter.category;
+    expenses = expenses.filter(e => (e.category || '') === cat);
+  }
+  return expenses;
+}
+
 function buildMonthlyData(expenses){
   const map = {};
   expenses.forEach(e=>{
@@ -131,7 +157,6 @@ function currentMonthTotal(expenses){
   return filterCurrentMonth(expenses).reduce((s,e)=>s+Number(e.amount||0),0);
 }
 
-// Charts
 let monthlyChart, catMonthChart, catWeekChart, catDayChart, trendChart;
 
 function renderCategoryList(){
@@ -203,16 +228,17 @@ function renderCategoryManager(){
 }
 
 function renderCharts(){
-  const expenses = loadExpenses();
+  const expenses = getFilteredExpenses();
+  const allExpenses = loadExpenses();
   const cm = filterCurrentMonth(expenses);
   const cw = filterCurrentWeek(expenses);
   const cd = filterCurrentDay(expenses);
 
-  const m = buildMonthlyData(cm);
+  const m = buildMonthlyData(expenses);
   const cMonth = buildCategoryData(cm);
   const cWeek = buildCategoryData(cw);
   const cDay = buildCategoryData(cd);
-  const t = buildTrendData(expenses);
+  const t = buildTrendData(expenses.length ? expenses : allExpenses);
   const s = loadSettings();
 
   const mCtx = document.getElementById('monthlyChart');
@@ -252,7 +278,7 @@ function renderCharts(){
     data:{ labels:cDay.labels, datasets:[{ data:cDay.values }] }
   });
 
-  const cmTotal = currentMonthTotal(expenses);
+  const cmTotal = currentMonthTotal(expenses.length ? expenses : allExpenses);
   const today = new Date();
   const daysInMonth = new Date(today.getFullYear(), today.getMonth()+1, 0).getDate();
   let limit = null;
@@ -267,19 +293,17 @@ function renderCharts(){
   });
 }
 
-// Expense table & summary
 function renderExpenseTable(){
   const tbody = document.querySelector('#expenseTable tbody');
   const bar = document.getElementById('summaryBar');
   if(!tbody || !bar) return;
   const s = loadSettings();
-  const expenses = loadExpenses();
-  const current = filterCurrentMonth(expenses);
+  const expenses = getFilteredExpenses();
 
   tbody.innerHTML = '';
   let total = 0;
-  current.sort((a,b)=> (a.date||'').localeCompare(b.date||''));
-  current.forEach(e=>{
+  expenses.sort((a,b)=> (a.date||'').localeCompare(b.date||''));
+  expenses.forEach(e=>{
     total += Number(e.amount||0);
     const tr = document.createElement('tr');
     tr.innerHTML = `<td>${e.date || ''}</td>
@@ -289,9 +313,20 @@ function renderExpenseTable(){
     tbody.appendChild(tr);
   });
 
-  let txt = `Current month total: ${total.toFixed(2)} €`;
+  let periodLabel = 'All data';
+  if(currentFilter.period==='day') periodLabel = 'Today';
+  else if(currentFilter.period==='week') periodLabel = 'This week';
+  else if(currentFilter.period==='month') periodLabel = 'This month';
+
+  let catLabel = '';
+  if(currentFilter.category !== 'all'){
+    catLabel = `, category: ${currentFilter.category}`;
+  }
+
+  let txt = `Filter: ${periodLabel}${catLabel} • Total: ${total.toFixed(2)} €`;
   let cls = 'summary-ok';
-  if(s.monthlyBudget){
+
+  if(currentFilter.period === 'month' && s.monthlyBudget){
     const mb = Number(s.monthlyBudget);
     const diff = mb - total;
     if(diff >= 0){
@@ -306,7 +341,6 @@ function renderExpenseTable(){
   bar.className = 'summary-bar ' + cls;
 }
 
-// Budget info
 function renderBudgetInfo(){
   const info = document.getElementById('budgetInfo');
   if(!info) return;
@@ -339,7 +373,7 @@ function renderBudgetInfo(){
   info.textContent = parts.join(' • ');
 }
 
-// CSV Export/Import
+// CSV export
 function buildCsvString(){
   const expenses = loadExpenses();
   if(!expenses.length) return '';
@@ -357,44 +391,60 @@ function buildCsvString(){
   return rows.join('\n');
 }
 
-function exportInteractive(){
+function exportDownload(){
   const csv = buildCsvString();
   if(!csv){
     alert('No expenses to export.');
     return;
   }
-  const choice = prompt('Export options:\n1 = Download file\n2 = Copy to clipboard\n3 = Open in new tab\n4 = Prepare email\n\nEnter 1, 2, 3 or 4:');
-  if(!choice) return;
-  if(choice === '1'){
-    const blob = new Blob([csv], {type:'text/csv'});
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'budgetmate_export.csv';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-  }else if(choice === '2'){
-    if(navigator.clipboard && navigator.clipboard.writeText){
-      navigator.clipboard.writeText(csv).then(()=>alert('CSV copied to clipboard.'),()=>alert('Could not copy to clipboard.'));
-    }else{
-      alert('Clipboard API not available.');
-    }
-  }else if(choice === '3'){
-    const blob = new Blob([csv], {type:'text/csv'});
-    const url = URL.createObjectURL(blob);
-    window.open(url, '_blank');
-  }else if(choice === '4'){
-    const mailto = 'mailto:?subject=' + encodeURIComponent('BudgetMate Export') +
-                   '&body=' + encodeURIComponent(csv);
-    window.location.href = mailto;
+  const blob = new Blob([csv], {type:'text/csv'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'budgetmate_export.csv';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+function exportCopy(){
+  const csv = buildCsvString();
+  if(!csv){
+    alert('No expenses to export.');
+    return;
+  }
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(csv).then(()=>alert('CSV copied to clipboard.'),()=>alert('Could not copy to clipboard.'));
   }else{
-    alert('Unknown option.');
+    alert('Clipboard API not available.');
   }
 }
 
-function importCsvFromText(text){
+function exportOpen(){
+  const csv = buildCsvString();
+  if(!csv){
+    alert('No expenses to export.');
+    return;
+  }
+  const blob = new Blob([csv], {type:'text/csv'});
+  const url = URL.createObjectURL(blob);
+  window.open(url, '_blank');
+}
+
+function exportEmail(){
+  const csv = buildCsvString();
+  if(!csv){
+    alert('No expenses to export.');
+    return;
+  }
+  const mailto = 'mailto:?subject=' + encodeURIComponent('BudgetMate Export') +
+                 '&body=' + encodeURIComponent(csv);
+  window.location.href = mailto;
+}
+
+// CSV import
+function importCsvFromText(text, mode){
   const lines = text.split(/\r?\n/).map(l=>l.trim()).filter(l=>l.length>0);
   if(lines.length < 2){
     alert('CSV file has no data rows.');
@@ -405,7 +455,7 @@ function importCsvFromText(text){
     alert('Invalid CSV header. Expected: date,category,amount,note');
     return false;
   }
-  const newExpenses = [];
+  const imported = [];
   for(let i=1;i<lines.length;i++){
     const parts = lines[i].split(',');
     if(parts.length < 3){
@@ -422,25 +472,115 @@ function importCsvFromText(text){
       return false;
     }
     const id = Date.now() + Math.random();
-    newExpenses.push({ id, date, amount, category, note });
+    imported.push({ id, date, amount, category, note });
   }
-  saveExpenses(newExpenses);
-  const cats = [...new Set(newExpenses.map(e=>(e.category||'').trim()).filter(Boolean))];
+  let finalExpenses = [];
+  if(mode === 'append'){
+    finalExpenses = loadExpenses().concat(imported);
+  }else{
+    finalExpenses = imported;
+  }
+  saveExpenses(finalExpenses);
+  const cats = [...new Set(finalExpenses.map(e=>(e.category||'').trim()).filter(Boolean))];
   saveCategories(cats);
   renderCategoryList();
   renderCategoryManager();
   renderCharts();
   renderExpenseTable();
   renderBudgetInfo();
-  alert('Data imported successfully.');
+  alert('Data imported successfully (' + mode + ').');
   return true;
 }
 
-// OCR helpers (marked area on canvas)
+function handleImportCsvFile(file, mode){
+  if(!file){
+    alert('No file selected.');
+    return;
+  }
+  const reader = new FileReader();
+  reader.onload = e => importCsvFromText(e.target.result, mode);
+  reader.readAsText(file);
+}
+
+// PDF import via backend
+async function importPdfViaBackend(file, mode){
+  if(!PDF_WORKER_URL || PDF_WORKER_URL.includes('YOUR_BACKEND_HOST')){
+    alert('Please configure PDF_WORKER_URL in app.js with your real backend URL.');
+    return;
+  }
+  try{
+    if(!file){
+      alert('No PDF file selected.');
+      return;
+    }
+    alert('Uploading PDF…');
+    const formData = new FormData();
+    formData.append('file', file);
+    const res = await fetch(PDF_WORKER_URL, {
+      method:'POST',
+      body:formData
+    });
+    if(!res.ok){
+      alert('Backend error: ' + res.status);
+      return;
+    }
+    const csv = await res.text();
+    alert('PDF parsed. Importing CSV…');
+    importCsvFromText(csv, mode);
+  }catch(e){
+    console.error(e);
+    alert('Error while importing PDF: ' + e.message);
+  }
+}
+
+// PDF export (PRINT button)
+async function printReport(){
+  const main = document.querySelector('.container');
+  if(!main){
+    alert('Nothing to print.');
+    return;
+  }
+  if(!window.html2canvas || !window.jspdf){
+    alert('Print libraries not available. Please ensure html2canvas & jsPDF are loaded.');
+    return;
+  }
+  try{
+    const canvas = await html2canvas(main, { scale: 2 });
+    const imgData = canvas.toDataURL('image/png');
+    const { jsPDF } = window.jspdf;
+    const pdf = new jsPDF('p','mm','a4');
+    const pageWidth = pdf.internal.pageSize.getWidth();
+    const pageHeight = pdf.internal.pageSize.getHeight();
+    const imgWidth = pageWidth;
+    const imgHeight = canvas.height * pageWidth / canvas.width;
+
+    if(imgHeight <= pageHeight){
+      pdf.addImage(imgData,'PNG',0,0,imgWidth,imgHeight);
+    }else{
+      let heightLeft = imgHeight;
+      let position = 0;
+      pdf.addImage(imgData,'PNG',0,position,imgWidth,imgHeight);
+      heightLeft -= pageHeight;
+      while(heightLeft > 0){
+        pdf.addPage();
+        position = position - pageHeight;
+        pdf.addImage(imgData,'PNG',0,position,imgWidth,imgHeight);
+        heightLeft -= pageHeight;
+      }
+    }
+    const dateStr = new Date().toISOString().slice(0,10);
+    pdf.save('BudgetMate_Report_' + dateStr + '.pdf');
+  }catch(e){
+    console.error(e);
+    alert('Error while generating PDF: ' + e.message);
+  }
+}
+
+// OCR helpers
 let ocrImage = null;
 let ocrCanvas, ocrCtx;
 let ocrScale = 1;
-let ocrMode = null; // 'amount' or 'date'
+let ocrMode = null;
 let isDrawing = false;
 let startX = 0, startY = 0;
 let amountRect = null;
@@ -450,6 +590,14 @@ function setOcrStatus(msg){
   const el = document.getElementById('ocrStatus');
   if(!el) return;
   el.textContent = msg || '';
+}
+
+function normalizeRect(r){
+  if(!r) return null;
+  let {x,y,w,h} = r;
+  if(w<0){ x = x+w; w = -w; }
+  if(h<0){ y = y+h; h = -h; }
+  return {x,y,w,h};
 }
 
 function drawOcrCanvas(){
@@ -475,7 +623,7 @@ function drawOcrCanvas(){
   }
 }
 
-function initOcrCanvas(file){
+function setupOcrFromDataUrl(dataUrl){
   const tools = document.getElementById('receiptTools');
   const canvas = document.getElementById('receiptCanvas');
   if(!canvas || !tools) return;
@@ -484,102 +632,79 @@ function initOcrCanvas(file){
   amountRect = null;
   dateRect = null;
   ocrImage = new Image();
-  const reader = new FileReader();
-  reader.onload = e => {
-    ocrImage.onload = ()=>{
-      const maxWidth = canvas.parentElement.clientWidth || 320;
-      const ratio = ocrImage.width/ocrImage.height;
-      const cw = Math.min(maxWidth, ocrImage.width);
-      const ch = cw/ratio;
-      canvas.width = cw;
-      canvas.height = ch;
-      ocrScale = ocrImage.width / cw;
-      drawOcrCanvas();
-      tools.style.display = 'block';
-      setOcrStatus('Image loaded. Mark amount area, then date area.');
-    };
-    ocrImage.src = e.target.result;
+  ocrImage.onload = ()=>{
+    const maxWidth = canvas.parentElement.clientWidth || 320;
+    const ratio = ocrImage.width/ocrImage.height;
+    const cw = Math.min(maxWidth, ocrImage.width);
+    const ch = cw/ratio;
+    canvas.width = cw;
+    canvas.height = ch;
+    ocrScale = ocrImage.width / cw;
+    drawOcrCanvas();
+    tools.style.display = 'block';
+    setOcrStatus('Image loaded. Mark amount area, then date area.');
   };
+  ocrImage.src = dataUrl;
+}
+
+function initOcrFromFile(file){
+  const reader = new FileReader();
+  reader.onload = e => setupOcrFromDataUrl(e.target.result);
   reader.readAsDataURL(file);
 }
 
-function attachOcrCanvasEvents(){
+function attachOcrCanvasPointerEvents(){
   const canvas = document.getElementById('receiptCanvas');
   if(!canvas) return;
-  canvas.addEventListener('mousedown', e=>{
-    if(!ocrMode) return;
+  const getPos = evt => {
     const rect = canvas.getBoundingClientRect();
-    startX = e.clientX - rect.left;
-    startY = e.clientY - rect.top;
-    isDrawing = true;
-  });
-  canvas.addEventListener('mousemove', e=>{
-    if(!isDrawing || !ocrMode) return;
-    const rect = canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-    const w = x - startX;
-    const h = y - startY;
-    if(ocrMode === 'amount'){
-      amountRect = {x:startX, y:startY, w, h};
-    }else if(ocrMode === 'date'){
-      dateRect = {x:startX, y:startY, w, h};
+    let clientX, clientY;
+    if(evt.touches && evt.touches.length){
+      clientX = evt.touches[0].clientX;
+      clientY = evt.touches[0].clientY;
+    }else{
+      clientX = evt.clientX;
+      clientY = evt.clientY;
     }
-    drawOcrCanvas();
-  });
-  canvas.addEventListener('touchstart', e=>{
-    if(!ocrMode) return;
-    const rect = canvas.getBoundingClientRect();
-    const t = e.touches[0];
-    startX = t.clientX - rect.left;
-    startY = t.clientY - rect.top;
-    isDrawing = true;
-  }, {passive:true});
-  canvas.addEventListener('touchmove', e=>{
-    if(!isDrawing || !ocrMode) return;
-    const rect = canvas.getBoundingClientRect();
-    const t = e.touches[0];
-    const x = t.clientX - rect.left;
-    const y = t.clientY - rect.top;
-    const w = x - startX;
-    const h = y - startY;
-    if(ocrMode === 'amount'){
-      amountRect = {x:startX, y:startY, w, h};
-    }else if(ocrMode === 'date'){
-      dateRect = {x:startX, y:startY, w, h};
-    }
-    drawOcrCanvas();
-  }, {passive:true});
-  window.addEventListener('mouseup', ()=>{
-    if(isDrawing){
-      isDrawing = false;
-      if(ocrMode === 'amount' && amountRect){
-        setOcrStatus('Amount area marked. Now mark date area or run OCR.');
-      }
-      if(ocrMode === 'date' && dateRect){
-        setOcrStatus('Date area marked. You can now run OCR.');
-      }
-    }
-  });
-  window.addEventListener('touchend', ()=>{
-    if(isDrawing){
-      isDrawing = false;
-      if(ocrMode === 'amount' && amountRect){
-        setOcrStatus('Amount area marked. Now mark date area or run OCR.');
-      }
-      if(ocrMode === 'date' && dateRect){
-        setOcrStatus('Date area marked. You can now run OCR.');
-      }
-    }
-  });
-}
+    return { x: clientX - rect.left, y: clientY - rect.top };
+  };
 
-function normalizeRect(r){
-  if(!r) return null;
-  let {x,y,w,h} = r;
-  if(w<0){ x = x+w; w = -w; }
-  if(h<0){ y = y+h; h = -h; }
-  return {x,y,w,h};
+  const start = evt => {
+    if(!ocrMode || !ocrCanvas) return;
+    evt.preventDefault();
+    const p = getPos(evt);
+    startX = p.x;
+    startY = p.y;
+    isDrawing = true;
+  };
+  const move = evt => {
+    if(!isDrawing || !ocrMode || !ocrCanvas) return;
+    evt.preventDefault();
+    const p = getPos(evt);
+    const w = p.x - startX;
+    const h = p.y - startY;
+    if(ocrMode === 'amount'){
+      amountRect = {x:startX, y:startY, w, h};
+    }else if(ocrMode === 'date'){
+      dateRect = {x:startX, y:startY, w, h};
+    }
+    drawOcrCanvas();
+  };
+  const end = evt => {
+    if(isDrawing){
+      isDrawing = false;
+      if(ocrMode === 'amount' && amountRect){
+        setOcrStatus('Amount area marked. Now mark date area or run OCR.');
+      }
+      if(ocrMode === 'date' && dateRect){
+        setOcrStatus('Date area marked. You can now run OCR.');
+      }
+    }
+  };
+
+  canvas.addEventListener('pointerdown', start);
+  canvas.addEventListener('pointermove', move);
+  window.addEventListener('pointerup', end);
 }
 
 function parseAmountAndDate(text){
@@ -674,6 +799,93 @@ async function runOcrOnSelection(){
   }
 }
 
+// Camera
+let cameraStream = null;
+async function openCamera(){
+  const container = document.getElementById('cameraContainer');
+  const video = document.getElementById('cameraPreview');
+  if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
+    alert('Camera API not available in this browser.');
+    return;
+  }
+  try{
+    cameraStream = await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}});
+    video.srcObject = cameraStream;
+    container.style.display = 'block';
+  }catch(e){
+    console.error(e);
+    alert('Could not access camera.');
+  }
+}
+function closeCamera(){
+  const container = document.getElementById('cameraContainer');
+  const video = document.getElementById('cameraPreview');
+  if(cameraStream){
+    cameraStream.getTracks().forEach(t=>t.stop());
+    cameraStream = null;
+  }
+  video.srcObject = null;
+  container.style.display = 'none';
+}
+function captureFromCamera(){
+  const video = document.getElementById('cameraPreview');
+  if(!video || !video.videoWidth){
+    alert('Camera not ready.');
+    return;
+  }
+  const temp = document.createElement('canvas');
+  const maxWidth = 1024;
+  let w = video.videoWidth;
+  let h = video.videoHeight;
+  if(w > maxWidth){
+    const ratio = maxWidth / w;
+    w = maxWidth;
+    h = Math.round(h * ratio);
+  }
+  temp.width = w;
+  temp.height = h;
+  const ctx = temp.getContext('2d');
+  ctx.drawImage(video, 0,0,w,h);
+  const dataUrl = temp.toDataURL('image/png');
+  setupOcrFromDataUrl(dataUrl);
+}
+
+// Filter modal helpers
+function openFilterModal(){
+  const modal = document.getElementById('filterModal');
+  const periodSel = document.getElementById('filterPeriod');
+  const catSel = document.getElementById('filterCategory');
+  if(!modal || !periodSel || !catSel) return;
+
+  // Period select
+  periodSel.value = currentFilter.period;
+
+  // Category options based on ALL historical expenses
+  const allExpenses = loadExpenses();
+  const usedCats = [
+    ...new Set(allExpenses.map(e => (e.category || '').trim()).filter(Boolean))
+  ].sort((a,b)=>a.localeCompare(b));
+
+  catSel.innerHTML = '';
+  const optAll = document.createElement('option');
+  optAll.value = 'all';
+  optAll.textContent = 'All categories';
+  catSel.appendChild(optAll);
+  usedCats.forEach(c => {
+    const opt = document.createElement('option');
+    opt.value = c;
+    opt.textContent = c;
+    catSel.appendChild(opt);
+  });
+  catSel.value = currentFilter.category === 'all' ? 'all' : currentFilter.category;
+
+  modal.classList.remove('hidden');
+}
+function closeFilterModal(){
+  const modal = document.getElementById('filterModal');
+  if(modal) modal.classList.add('hidden');
+}
+
 // Init
 document.addEventListener('DOMContentLoaded', () => {
   const form = document.getElementById('expenseForm');
@@ -729,36 +941,59 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  const exportBtn = document.getElementById('exportCsv');
-  if(exportBtn){
-    exportBtn.addEventListener('click', exportInteractive);
+  const exportDownloadBtn = document.getElementById('exportDownload');
+  const exportCopyBtn = document.getElementById('exportCopy');
+  const exportOpenBtn = document.getElementById('exportOpen');
+  const exportEmailBtn = document.getElementById('exportEmail');
+  if(exportDownloadBtn) exportDownloadBtn.addEventListener('click', exportDownload);
+  if(exportCopyBtn) exportCopyBtn.addEventListener('click', exportCopy);
+  if(exportOpenBtn) exportOpenBtn.addEventListener('click', exportOpen);
+  if(exportEmailBtn) exportEmailBtn.addEventListener('click', exportEmail);
+
+  const importCsvBtn = document.getElementById('importCsvBtn');
+  const importPdfBtn = document.getElementById('importPdfBtn');
+  const importFileCsv = document.getElementById('importFileCsv');
+  const importFilePdf = document.getElementById('importFilePdf');
+
+  if(importCsvBtn && importFileCsv){
+    importCsvBtn.addEventListener('click', ()=>{
+      const mode = prompt('Import CSV mode:\n1 = overwrite existing data\n2 = append to existing data\n\nEnter 1 or 2:');
+      if(!mode) return;
+      let modeKey = null;
+      if(mode === '1') modeKey = 'overwrite';
+      else if(mode === '2') modeKey = 'append';
+      else{
+        alert('Unknown option.');
+        return;
+      }
+      if(!confirm('Import will ' + modeKey + ' data. Continue?')) return;
+      importFileCsv.value = '';
+      importFileCsv.onchange = ()=>{
+        const file = importFileCsv.files && importFileCsv.files[0];
+        handleImportCsvFile(file, modeKey);
+      };
+      importFileCsv.click();
+    });
   }
 
-  const importBtn = document.getElementById('importCsv');
-  const importFile = document.getElementById('importFile');
-  if(importBtn && importFile){
-    importBtn.addEventListener('click', ()=>{
-      const mode = prompt('Import from:\n1 = CSV file\n2 = Paste CSV text\n\nEnter 1 or 2:');
+  if(importPdfBtn && importFilePdf){
+    importPdfBtn.addEventListener('click', ()=>{
+      const mode = prompt('Import PDF mode:\n1 = overwrite existing data\n2 = append to existing data\n\nEnter 1 or 2:');
       if(!mode) return;
-      if(mode === '1'){
-        if(!confirm('Do you really want to overwrite all datas?')) return;
-        importFile.value = '';
-        importFile.click();
-      }else if(mode === '2'){
-        if(!confirm('Do you really want to overwrite all datas?')) return;
-        const text = prompt('Paste CSV content here:');
-        if(!text) return;
-        importCsvFromText(text);
-      }else{
+      let modeKey = null;
+      if(mode === '1') modeKey = 'overwrite';
+      else if(mode === '2') modeKey = 'append';
+      else{
         alert('Unknown option.');
+        return;
       }
-    });
-    importFile.addEventListener('change', ()=>{
-      const file = importFile.files && importFile.files[0];
-      if(!file) return;
-      const reader = new FileReader();
-      reader.onload = e => importCsvFromText(e.target.result);
-      reader.readAsText(file);
+      if(!confirm('Import from PDF will ' + modeKey + ' data. Continue?')) return;
+      importFilePdf.value = '';
+      importFilePdf.onchange = ()=>{
+        const file = importFilePdf.files && importFilePdf.files[0];
+        importPdfViaBackend(file, modeKey);
+      };
+      importFilePdf.click();
     });
   }
 
@@ -767,13 +1002,20 @@ document.addEventListener('DOMContentLoaded', () => {
     receiptInput.addEventListener('change', ()=>{
       const file = receiptInput.files && receiptInput.files[0];
       if(file){
-        initOcrCanvas(file);
+        initOcrFromFile(file);
       }else{
         setOcrStatus('');
       }
     });
   }
-  attachOcrCanvasEvents();
+  attachOcrCanvasPointerEvents();
+
+  const openCamBtn = document.getElementById('openCamera');
+  const captureBtn = document.getElementById('capturePhoto');
+  const closeCamBtn = document.getElementById('closeCamera');
+  if(openCamBtn) openCamBtn.addEventListener('click', openCamera);
+  if(closeCamBtn) closeCamBtn.addEventListener('click', closeCamera);
+  if(captureBtn) captureBtn.addEventListener('click', captureFromCamera);
 
   const markAmountBtn = document.getElementById('markAmount');
   const markDateBtn = document.getElementById('markDate');
@@ -827,7 +1069,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const deleteAllBtn = document.getElementById('deleteAll');
   if(deleteAllBtn){
     deleteAllBtn.addEventListener('click', ()=>{
-      const msg = 'DELETE ALL EXPENSE DATA\n\nThis will delete:\n• all saved expenses\n• all saved categories\n\nRules & settings will stay.\n\nAre you sure?\nYes = delete all\nNo = cancel';
+      const msg = 'DELETE ALL EXPENSE DATA\n\nThis will delete:\n• all saved expenses\n• all saved categories\n\nBudgets & settings will stay.\n\nAre you sure?\nYes = delete all\nNo = cancel';
       if(!confirm(msg)) return;
       saveExpenses([]);
       saveCategories([]);
@@ -849,13 +1091,53 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  const resetAllBtn = document.getElementById('resetAllApp');
-  if(resetAllBtn){
-    resetAllBtn.addEventListener('click', ()=>{
-      const msg = 'RESET ALL DATA & RULES\n\nThis will delete:\n• all expenses\n• all categories\n• all budgets\n• dark mode setting\n\nThe app will return to its initial state.\n\nAre you sure?\nYes = reset everything\nNo = cancel';
-      if(!confirm(msg)) return;
-      clearAllDataAndSettings();
-      location.reload();
+  const printBtn = document.getElementById('printReport');
+  if(printBtn){
+    printBtn.addEventListener('click', ()=>{
+      printReport();
+    });
+  }
+
+  const thDate = document.getElementById('thDate');
+  const thCategory = document.getElementById('thCategory');
+  if(thDate) thDate.addEventListener('click', openFilterModal);
+  if(thCategory) thCategory.addEventListener('click', openFilterModal);
+
+  const modal = document.getElementById('filterModal');
+  const closeFilterBtn = document.getElementById('closeFilter');
+  const applyFilterBtn = document.getElementById('applyFilter');
+  const clearFilterBtn = document.getElementById('clearFilter');
+  const periodSel = document.getElementById('filterPeriod');
+  const catSel = document.getElementById('filterCategory');
+
+  if(closeFilterBtn){
+    closeFilterBtn.addEventListener('click', ()=>{
+      closeFilterModal();
+    });
+  }
+  if(modal){
+    const backdrop = modal.querySelector('.modal-backdrop');
+    if(backdrop){
+      backdrop.addEventListener('click', ()=>{
+        closeFilterModal();
+      });
+    }
+  }
+  if(applyFilterBtn){
+    applyFilterBtn.addEventListener('click', ()=>{
+      if(periodSel) currentFilter.period = periodSel.value;
+      if(catSel) currentFilter.category = catSel.value;
+      closeFilterModal();
+      renderCharts();
+      renderExpenseTable();
+    });
+  }
+  if(clearFilterBtn){
+    clearFilterBtn.addEventListener('click', ()=>{
+      currentFilter = { period:'all', category:'all' };
+      closeFilterModal();
+      renderCharts();
+      renderExpenseTable();
     });
   }
 

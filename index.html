@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>BudgetMate Pro</title>
+  <title>BudgetMate Pro v12</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <link rel="manifest" href="./manifest.webmanifest">
   <meta name="theme-color" content="#0F172A">
@@ -11,13 +11,15 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <!-- Tesseract.js for OCR -->
   <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+  <!-- html2canvas + jsPDF for PDF export -->
+  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 </head>
 <body>
 <div class="container">
   <header class="header">
-    <div><h1>BudgetMate Pro v8</h1></div>
+    <div><h1>BudgetMate Pro v12</h1></div>
     <div class="header-actions">
-      <button id="resetAllApp" class="btn-danger" type="button">RESET</button>
       <button id="darkToggle" class="btn-secondary" type="button">Dark mode</button>
     </div>
   </header>
@@ -73,8 +75,18 @@
       </div>
       <div class="form-row">
         <label for="receipt">Receipt photo (optional)</label>
-        <input id="receipt" name="receipt" type="file" accept="image/*" capture="environment">
-        <p class="hint small">Step 1: choose a photo. Step 2: mark amount & date areas with your finger. Step 3: run OCR.</p>
+        <div class="camera-row">
+          <input id="receipt" name="receipt" type="file" accept="image/*;capture=camera">
+          <button type="button" id="openCamera" class="btn-secondary">Open camera</button>
+        </div>
+        <p class="hint small">Option 1: take a new photo. Option 2: choose from gallery. Then mark amount & date and run OCR.</p>
+        <div id="cameraContainer" class="camera-container" style="display:none;">
+          <video id="cameraPreview" autoplay playsinline></video>
+          <div class="camera-actions">
+            <button type="button" id="capturePhoto" class="btn-primary">Capture</button>
+            <button type="button" id="closeCamera" class="btn-secondary">Close</button>
+          </div>
+        </div>
         <div id="receiptTools" class="receipt-tools" style="display:none;">
           <div class="receipt-buttons">
             <button type="button" id="markAmount" class="btn-secondary">Mark amount area</button>
@@ -99,13 +111,20 @@
   <section class="card">
     <h2>Export / Import</h2>
     <div class="export-row">
-      <button id="exportCsv" class="btn-secondary" type="button">Export</button>
-      <button id="importCsv" class="btn-secondary" type="button">Import</button>
-      <input id="importFile" type="file" accept=".csv,text/csv" style="display:none">
+      <button id="exportDownload" class="btn-secondary" type="button">Export – Download</button>
+      <button id="exportCopy" class="btn-secondary" type="button">Export – Copy</button>
+      <button id="exportOpen" class="btn-secondary" type="button">Export – Open</button>
+      <button id="exportEmail" class="btn-secondary" type="button">Export – Email</button>
+    </div>
+    <div class="export-row">
+      <button id="importCsvBtn" class="btn-primary" type="button">Import CSV</button>
+      <button id="importPdfBtn" class="btn-primary" type="button">Import PDF (statement)</button>
+      <input id="importFileCsv" type="file" accept=".csv, text/csv" style="display:none">
+      <input id="importFilePdf" type="file" accept="application/pdf" style="display:none">
     </div>
     <p class="hint small">
-      Export options: download file, copy to clipboard, open in new tab, or prepare email.<br>
-      Import options: from file or paste CSV text. Import overwrites all existing data only if format is valid.
+      CSV: import from BudgetMate export or Excel.<br>
+      PDF: bank statements via your backend at <code>PDF_WORKER_URL</code> (see app.js).
     </p>
   </section>
 
@@ -146,13 +165,13 @@
   </section>
 
   <section class="card">
-    <h2>Expenses (current month)</h2>
+    <h2>Expenses (selection)</h2>
     <div id="summaryBar" class="summary-bar"></div>
     <table id="expenseTable">
       <thead>
         <tr>
-          <th>Date</th>
-          <th>Category</th>
+          <th id="thDate" class="th-clickable">Date</th>
+          <th id="thCategory" class="th-clickable">Category</th>
           <th>Amount (€)</th>
           <th>Del</th>
         </tr>
@@ -160,10 +179,41 @@
       <tbody></tbody>
     </table>
     <div class="table-actions">
+      <button id="printReport" class="btn-secondary" type="button">PRINT</button>
       <button id="deleteAll" class="btn-danger" type="button">DELETE ALL</button>
       <button id="newRules" class="btn-secondary" type="button">NEW RULES</button>
     </div>
   </section>
+
+  <!-- Filter Popup -->
+  <div id="filterModal" class="modal hidden">
+    <div class="modal-backdrop"></div>
+    <div class="modal-content">
+      <h3>Filter expenses</h3>
+      <div class="form-row">
+        <label for="filterPeriod">Period</label>
+        <select id="filterPeriod">
+          <option value="all">All data</option>
+          <option value="day">Today</option>
+          <option value="week">This week</option>
+          <option value="month">This month</option>
+        </select>
+      </div>
+      <div class="form-row">
+        <label for="filterCategory">Category</label>
+        <select id="filterCategory">
+          <option value="all">All categories</option>
+        </select>
+      </div>
+      <p class="hint small">Categories are based on all your expenses (full history).</p>
+      <div class="modal-actions">
+        <button id="applyFilter" class="btn-primary" type="button">Apply</button>
+        <button id="clearFilter" class="btn-secondary" type="button">Clear</button>
+        <button id="closeFilter" class="btn-secondary" type="button">Close</button>
+      </div>
+    </div>
+  </div>
+
 </div>
 
 <script src="./app.js"></script>
