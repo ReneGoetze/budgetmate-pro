@@ -46,7 +46,6 @@ input,select{
   background:var(--card);
   color:var(--primary);
 }
-input[type="file"]{padding:4px;}
 .btn-primary,.btn-secondary,.btn-danger{
   border:none;
   border-radius:999px;
@@ -101,12 +100,7 @@ body.dark .cat-btn{
 }
 .category-row{display:flex;gap:8px;}
 .category-row input{flex:1;}
-.export-row{
-  display:flex;
-  flex-wrap:wrap;
-  gap:8px;
-  margin-top:6px;
-}
+
 #expenseTable{
   width:100%;
   border-collapse:collapse;
@@ -145,6 +139,7 @@ body.dark .del-btn{
 }
 .summary-ok{color:#16A34A;}
 .summary-warn{color:#F97316;}
+
 .cat-charts{
   display:flex;
   flex-wrap:wrap;
@@ -156,6 +151,7 @@ body.dark .del-btn{
 .cat-chart canvas{
   padding:8px;
 }
+
 .cat-manager{
   border-radius:8px;
   border:1px solid #E5E7EB;
@@ -185,58 +181,6 @@ body.dark .del-btn{
 }
 body.dark .cat-manager{border-color:#1F2937;}
 body.dark .cat-item-btn{background:#111827;color:#E5E7EB;}
-
-.receipt-tools{
-  margin-top:8px;
-}
-.receipt-buttons{
-  display:flex;
-  flex-wrap:wrap;
-  gap:6px;
-  margin-bottom:6px;
-}
-.receipt-canvas-wrapper{
-  margin-top:6px;
-  max-width:100%;
-  border-radius:8px;
-  overflow:hidden;
-  border:1px solid #E5E7EB;
-}
-#receiptCanvas{
-  width:100%;
-  height:auto;
-  display:block;
-  padding:0;
-  box-shadow:none;
-}
-.ocr-status{
-  font-weight:600;
-}
-.camera-row{
-  display:flex;
-  flex-wrap:wrap;
-  gap:8px;
-  align-items:center;
-}
-.camera-container{
-  margin-top:8px;
-  border-radius:8px;
-  border:1px solid #D1D5DB;
-  overflow:hidden;
-}
-#cameraPreview{
-  width:100%;
-  max-height:260px;
-  object-fit:cover;
-  background:#000;
-}
-.camera-actions{
-  display:flex;
-  justify-content:flex-end;
-  gap:8px;
-  padding:6px;
-  background:var(--card);
-}
 
 /* Modal for filter */
 .modal{

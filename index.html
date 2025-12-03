@@ -2,15 +2,13 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>BudgetMate Pro v12</title>
+  <title>BudgetMate Pro v13</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <link rel="manifest" href="./manifest.webmanifest">
   <meta name="theme-color" content="#0F172A">
   <link rel="stylesheet" href="./style.css">
   <!-- Chart.js -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <!-- Tesseract.js for OCR -->
-  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
   <!-- html2canvas + jsPDF for PDF export -->
   <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
@@ -18,7 +16,7 @@
 <body>
 <div class="container">
   <header class="header">
-    <div><h1>BudgetMate Pro v12</h1></div>
+    <div><h1>BudgetMate Pro v13</h1></div>
     <div class="header-actions">
       <button id="darkToggle" class="btn-secondary" type="button">Dark mode</button>
     </div>
@@ -73,59 +71,12 @@
         <label for="note">Note (optional)</label>
         <input id="note" name="note" type="text" placeholder="e.g. Supermarket, Lidl, etc.">
       </div>
-      <div class="form-row">
-        <label for="receipt">Receipt photo (optional)</label>
-        <div class="camera-row">
-          <input id="receipt" name="receipt" type="file" accept="image/*;capture=camera">
-          <button type="button" id="openCamera" class="btn-secondary">Open camera</button>
-        </div>
-        <p class="hint small">Option 1: take a new photo. Option 2: choose from gallery. Then mark amount & date and run OCR.</p>
-        <div id="cameraContainer" class="camera-container" style="display:none;">
-          <video id="cameraPreview" autoplay playsinline></video>
-          <div class="camera-actions">
-            <button type="button" id="capturePhoto" class="btn-primary">Capture</button>
-            <button type="button" id="closeCamera" class="btn-secondary">Close</button>
-          </div>
-        </div>
-        <div id="receiptTools" class="receipt-tools" style="display:none;">
-          <div class="receipt-buttons">
-            <button type="button" id="markAmount" class="btn-secondary">Mark amount area</button>
-            <button type="button" id="markDate" class="btn-secondary">Mark date area</button>
-            <button type="button" id="clearMarks" class="btn-secondary">Clear marks</button>
-            <button type="button" id="runOcr" class="btn-primary">Run OCR on selection</button>
-          </div>
-          <p id="ocrStatus" class="hint small ocr-status"></p>
-          <div class="receipt-canvas-wrapper">
-            <canvas id="receiptCanvas"></canvas>
-          </div>
-        </div>
-      </div>
 
       <div style="height:12px;"></div>
 
       <button type="submit" class="btn-primary">Save expense</button>
     </form>
     <p class="hint">All data is stored only in this browser (localStorage).</p>
-  </section>
-
-  <section class="card">
-    <h2>Export / Import</h2>
-    <div class="export-row">
-      <button id="exportDownload" class="btn-secondary" type="button">Export – Download</button>
-      <button id="exportCopy" class="btn-secondary" type="button">Export – Copy</button>
-      <button id="exportOpen" class="btn-secondary" type="button">Export – Open</button>
-      <button id="exportEmail" class="btn-secondary" type="button">Export – Email</button>
-    </div>
-    <div class="export-row">
-      <button id="importCsvBtn" class="btn-primary" type="button">Import CSV</button>
-      <button id="importPdfBtn" class="btn-primary" type="button">Import PDF (statement)</button>
-      <input id="importFileCsv" type="file" accept=".csv, text/csv" style="display:none">
-      <input id="importFilePdf" type="file" accept="application/pdf" style="display:none">
-    </div>
-    <p class="hint small">
-      CSV: import from BudgetMate export or Excel.<br>
-      PDF: bank statements via your backend at <code>PDF_WORKER_URL</code> (see app.js).
-    </p>
   </section>
 
   <section class="card" id="rulesCard">
