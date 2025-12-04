@@ -7,9 +7,20 @@
   <link rel="manifest" href="./manifest.webmanifest">
   <meta name="theme-color" content="#0F172A">
   <link rel="stylesheet" href="./style.css">
+  <!-- Chart.js -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <!-- html2canvas + jsPDF for PDF export -->
   <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+
+  <!-- Our modular JS (order is important!) -->
+  <script src="./js/storage.js"></script>
+  <script src="./js/budget.js"></script>
+  <script src="./js/categories.js"></script>
+  <script src="./js/charts.js"></script>
+  <script src="./js/filters.js"></script>
+  <script src="./js/ui.js"></script>
+  <script src="./js/main.js"></script>
 </head>
 <body>
 <div class="container">
@@ -205,7 +216,6 @@
 
 </div>
 
-<script src="./app.js"></script>
 <script>
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('./service-worker.js');
