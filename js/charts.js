@@ -1,1 +1,0 @@
-// JS placeholder for charts.js
