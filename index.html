@@ -2,18 +2,15 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>BudgetMate v16</title>
+  <title>BudgetMate v17</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <link rel="manifest" href="./manifest.webmanifest">
   <meta name="theme-color" content="#0F172A">
   <link rel="stylesheet" href="./style.css">
-  <!-- Chart.js -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <!-- html2canvas + jsPDF for PDF export -->
   <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 
-  <!-- Our modular JS (order is important!) -->
   <script src="./js/storage.js"></script>
   <script src="./js/budget.js"></script>
   <script src="./js/categories.js"></script>
@@ -25,7 +22,7 @@
 <body>
 <div class="container">
   <header class="header">
-    <div><h1>BudgetMate v16</h1></div>
+    <div><h1>BudgetMate v17</h1></div>
     <div class="header-actions">
       <button id="darkToggle" class="btn-secondary" type="button">Dark mode</button>
     </div>
@@ -33,6 +30,7 @@
 
   <section class="card">
     <h2>Budget</h2>
+    <p class="hint small">Use either a <strong>daily</strong> or a <strong>monthly</strong> budget – not both at the same time.</p>
     <div class="form-row-inline">
       <div class="form-row">
         <label for="dailyBudget">Daily budget (€)</label>
@@ -99,7 +97,7 @@
     </div>
   </section>
 
-  <section id="monthlySection">
+  <section class="card" id="monthlySection">
     <div class="month-header">
       <div>
         <h2>Monthly Spending</h2>
@@ -117,7 +115,9 @@
         <button id="exportMonthPdf" class="btn-secondary" type="button">Export Month PDF</button>
       </div>
     </div>
-    <canvas id="monthlyChart"></canvas>
+    <div class="chart-wrapper">
+      <canvas id="monthlyChart"></canvas>
+    </div>
   </section>
 
   <section>
@@ -140,19 +140,25 @@
 
   <section>
     <h2>Trend (last 6 months)</h2>
-    <canvas id="trendChart"></canvas>
+    <div class="chart-wrapper">
+      <canvas id="trendChart"></canvas>
+    </div>
   </section>
 
   <section>
     <h2>Yearly Overview</h2>
-    <canvas id="yearlyChart"></canvas>
+    <div class="chart-wrapper">
+      <canvas id="yearlyChart"></canvas>
+    </div>
     <p id="yearSummary" class="hint"></p>
     <div id="yearTable" class="year-table"></div>
   </section>
 
   <section>
     <h2>Weekly Overview (last 12 weeks)</h2>
-    <canvas id="weeklyChart"></canvas>
+    <div class="chart-wrapper">
+      <canvas id="weeklyChart"></canvas>
+    </div>
     <p id="weekSummary" class="hint"></p>
   </section>
 

@@ -45,8 +45,17 @@ document.addEventListener('DOMContentLoaded',()=>{
       const st=loadSettings();
       const dv=document.getElementById('dailyBudget').value;
       const mv=document.getElementById('monthlyBudget').value;
-      st.dailyBudget=dv?parseFloat(dv):null;
-      st.monthlyBudget=mv?parseFloat(mv):null;
+      const hasDaily = dv && !isNaN(parseFloat(dv)) && parseFloat(dv) > 0;
+      const hasMonthly = mv && !isNaN(parseFloat(mv)) && parseFloat(mv) > 0;
+
+      if(hasDaily && hasMonthly){
+        alert('Please enter EITHER a daily OR a monthly budget, not both.');
+        return;
+      }
+
+      st.dailyBudget = hasDaily ? parseFloat(dv) : null;
+      st.monthlyBudget = hasMonthly ? parseFloat(mv) : null;
+
       saveSettings(st);
       renderBudgetInfo();
       renderExpenseTable();

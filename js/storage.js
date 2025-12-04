@@ -7,15 +7,16 @@ const SETTINGS_KEY = 'bm_settings';
 const COLOR_GREEN   = 'rgba(34,197,94,0.8)';
 const COLOR_RED     = 'rgba(239,68,68,0.8)';
 const COLOR_NEUTRAL = 'rgba(59,130,246,0.5)';
+const COLOR_LIGHT_BLUE = 'rgba(147,197,253,0.9)'; // lighter blue for weekly chart
 
-// monthOffset: 0=current, -1=previous, ...
+const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+
 let monthOffset = 0;
 
-// Filter state
 let currentFilter = {
-  period: 'all',   // 'all' | 'day' | 'week' | 'month' | 'range'
-  category: 'all', // 'all' | name
-  from: null,      // ISO date
+  period: 'all',
+  category: 'all',
+  from: null,
   to: null
 };
 
@@ -82,7 +83,7 @@ function getSelectedMonthKey(){
 }
 function getSelectedMonthLabel(){
   const d = getSelectedMonthDate();
-  const m = d.toLocaleString(undefined,{month:'long'});
+  const m = MONTHS[d.getMonth()];
   return m + ' ' + d.getFullYear();
 }
 

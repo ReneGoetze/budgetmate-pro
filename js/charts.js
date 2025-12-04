@@ -41,7 +41,7 @@ function buildYearlyData(expenses, year, settings){
     const ym = year+'-'+pad2(m+1);
     const sum = expenses.filter(e=>(e.date||'').startsWith(ym))
       .reduce((s,e)=>s+Number(e.amount||0),0);
-    labels.push(new Date(year,m,1).toLocaleString(undefined,{month:'short'}));
+    labels.push(MONTHS[m]);
     values.push(sum);
     totalYear+=sum;
     if(sum>maxVal){maxVal=sum;maxM=m;}
@@ -67,8 +67,8 @@ function buildYearlyData(expenses, year, settings){
     totalYear,
     avgMonth: totalYear/12,
     maxVal,minVal,
-    maxMonthLabel: maxM!=null?new Date(year,maxM,1).toLocaleString(undefined,{month:'long'}):'-',
-    minMonthLabel: minM!=null?new Date(year,minM,1).toLocaleString(undefined,{month:'long'}):'-'
+    maxMonthLabel: maxM!=null?MONTHS[maxM]:'-',
+    minMonthLabel: minM!=null?MONTHS[minM]:'-'
   };
 }
 function buildWeeklyData(expenses){
@@ -205,14 +205,11 @@ function populateMonthYearSelectors(){
   const mSel=document.getElementById('monthSelect');
   const ySel=document.getElementById('yearSelect');
   if(!mSel || !ySel) return;
-  const months=[];
-  for(let m=0;m<12;m++){
-    months.push(new Date(2000,m,1).toLocaleString(undefined,{month:'short'}));
-  }
   mSel.innerHTML='';
-  months.forEach((name,idx)=>{
+  MONTHS.forEach((name,idx)=>{
     const opt=document.createElement('option');
-    opt.value=idx; opt.textContent=name;
+    opt.value=idx;
+    opt.textContent=name;
     mSel.appendChild(opt);
   });
   const now=new Date(), yNow=now.getFullYear(), start=yNow-10;
@@ -283,20 +280,28 @@ function renderCharts(){
 
   monthlyChart=new Chart(mCtx,{
     type:'bar',
-    data:{labels:m.days,datasets:[{label:'Daily Spending (€)',data:m.values,backgroundColor:barColors}]}
+    data:{labels:m.days,datasets:[{label:'Daily Spending (€)',data:m.values,backgroundColor:barColors}]},
+    options:{
+      plugins:{legend:{display:false}},
+      responsive:true,
+      maintainAspectRatio:false
+    }
   });
 
   catMonthChart=new Chart(cMonthCtx,{
     type:'doughnut',
-    data:{labels:cMonth.labels,datasets:[{data:cMonth.values}]}
+    data:{labels:cMonth.labels,datasets:[{data:cMonth.values}]},
+    options:{plugins:{legend:{display:true}}}
   });
   catWeekChart=new Chart(cWeekCtx,{
     type:'doughnut',
-    data:{labels:cWeek.labels,datasets:[{data:cWeek.values}]}
+    data:{labels:cWeek.labels,datasets:[{data:cWeek.values}]},
+    options:{plugins:{legend:{display:true}}}
   });
   catDayChart=new Chart(cDayCtx,{
     type:'doughnut',
-    data:{labels:cDay.labels,datasets:[{data:cDay.values}]}
+    data:{labels:cDay.labels,datasets:[{data:cDay.values}]},
+    options:{plugins:{legend:{display:true}}}
   });
 
   const cmTotal=currentMonthTotal(all);
@@ -310,7 +315,12 @@ function renderCharts(){
 
   trendChart=new Chart(tCtx,{
     type:'line',
-    data:{labels:trend.labels,datasets:[{label:'Monthly Total (€)',data:trend.values,borderColor:lineColor,backgroundColor:lineColor,tension:0.2}]}
+    data:{labels:trend.labels,datasets:[{label:'Monthly Total (€)',data:trend.values,borderColor:lineColor,backgroundColor:lineColor,tension:0.2}]},
+    options:{
+      plugins:{legend:{display:false}},
+      responsive:true,
+      maintainAspectRatio:false
+    }
   });
 
   renderMonthLabel();
@@ -321,7 +331,12 @@ function renderCharts(){
   const yData=buildYearlyData(all,year,s);
   yearlyChart=new Chart(yCtx,{
     type:'bar',
-    data:{labels:yData.labels,datasets:[{label:'Monthly total (€)',data:yData.values,backgroundColor:yData.colors}]}
+    data:{labels:yData.labels,datasets:[{label:'Monthly total (€)',data:yData.values,backgroundColor:yData.colors}]},
+    options:{
+      plugins:{legend:{display:false}},
+      responsive:true,
+      maintainAspectRatio:false
+    }
   });
   const yearSumEl=document.getElementById('yearSummary');
   if(yearSumEl){
@@ -336,6 +351,7 @@ function renderCharts(){
     for(let i=0;i<12;i++){
       const label=yData.labels[i];
       const sum=yData.values[i];
+      if(sum===0) continue;
       const budget=yData.budgets[i];
       const diff=yData.diffs[i];
       let status='-',cls='';
@@ -358,7 +374,12 @@ function renderCharts(){
   const wData=buildWeeklyData(all);
   weeklyChart=new Chart(wCtx,{
     type:'bar',
-    data:{labels:wData.labels,datasets:[{label:'Weekly total (€)',data:wData.values,backgroundColor:COLOR_NEUTRAL}]}
+    data:{labels:wData.labels,datasets:[{label:'Weekly total (€)',data:wData.values,backgroundColor:COLOR_LIGHT_BLUE}]},
+    options:{
+      plugins:{legend:{display:false}},
+      responsive:true,
+      maintainAspectRatio:false
+    }
   });
   const weekSummaryEl=document.getElementById('weekSummary');
   if(weekSummaryEl){

@@ -65,7 +65,7 @@ async function exportMonthPdf(){
       }
     }
     const d=getSelectedMonthDate();
-    const m=d.toLocaleString(undefined,{month:'long'});
+    const m=MONTHS[d.getMonth()];
     const y=d.getFullYear();
     pdf.save(`BudgetMate_Month_${m}_${y}.pdf`);
   }catch(e){
