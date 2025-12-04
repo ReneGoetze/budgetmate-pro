@@ -1,4 +1,4 @@
-// budget.js – budget info + cumulative view
+// budget.js
 
 function renderBudgetInfo(){
   const info   = document.getElementById('budgetInfo');

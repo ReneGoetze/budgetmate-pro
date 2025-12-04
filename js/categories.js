@@ -1,4 +1,4 @@
-// categories.js – list, manager, favorites
+// categories.js
 
 function renderCategoryList(){
   const cats = loadCategories().slice().sort((a,b)=>a.localeCompare(b));

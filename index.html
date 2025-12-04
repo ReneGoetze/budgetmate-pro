@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>BudgetMate</title>
+  <title>BudgetMate v19</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <link rel="manifest" href="./manifest.webmanifest">
   <meta name="theme-color" content="#0F172A">
@@ -23,7 +23,7 @@
 <body>
 <div class="container">
   <header class="header">
-    <div><h1>BudgetMate</h1></div>
+    <div><h1>BudgetMate v19</h1></div>
     <div class="header-actions">
       <button id="darkToggle" class="btn-secondary" type="button">Dark mode</button>
     </div>
@@ -123,6 +123,7 @@
 
   <section class="card">
     <h2>Categories</h2>
+    <div id="categoryLegend" class="category-legend"></div>
     <div class="cat-charts">
       <div class="cat-chart">
         <h3>Month</h3>
@@ -177,7 +178,9 @@
       </thead>
       <tbody></tbody>
     </table>
+    <div style="height:12px;"></div>
     <div class="table-actions">
+      <button id="exportCsv" class="btn-secondary" type="button">Export CSV</button>
       <button id="printReport" class="btn-secondary" type="button">PRINT</button>
       <button id="deleteAll" class="btn-danger" type="button">DELETE ALL</button>
       <button id="newRules" class="btn-secondary" type="button">NEW RULES</button>

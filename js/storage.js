@@ -1,4 +1,4 @@
-// storage.js – keys, helpers, global state
+// storage.js
 
 const STORAGE_KEY = 'bm_expenses';
 const CATEGORY_KEY = 'bm_categories';
@@ -7,7 +7,13 @@ const SETTINGS_KEY = 'bm_settings';
 const COLOR_GREEN   = 'rgba(34,197,94,0.8)';
 const COLOR_RED     = 'rgba(239,68,68,0.8)';
 const COLOR_NEUTRAL = 'rgba(59,130,246,0.5)';
-const COLOR_LIGHT_BLUE = 'rgba(147,197,253,0.9)'; // lighter blue for weekly chart
+const COLOR_LIGHT_BLUE = 'rgba(147,197,253,0.9)';
+
+const CATEGORY_COLORS = [
+  '#3B82F6','#EC4899','#10B981','#F59E0B','#8B5CF6',
+  '#F97316','#22C55E','#E11D48','#6366F1','#0EA5E9',
+  '#14B8A6','#FACC15','#4B5563'
+];
 
 const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 
@@ -44,18 +50,32 @@ function loadSettings(){
 }
 function saveSettings(s){ saveJSON(SETTINGS_KEY, s); }
 
+function normalizeCategoryName(name){
+  if(!name) return '';
+  return name.trim();
+}
+
 function addExpense(date, amount, category, note){
+  let cats = loadCategories();
+  let rawCat = normalizeCategoryName(category);
+  if(!rawCat) rawCat = 'Uncategorized';
+
+  // Merge categories case-insensitively
+  let canonical = rawCat;
+  const idx = cats.findIndex(c => c.toLowerCase() === rawCat.toLowerCase());
+  if(idx >= 0){
+    canonical = cats[idx];
+  }else{
+    cats.push(rawCat);
+    cats.sort((a,b)=>a.localeCompare(b));
+    saveCategories(cats);
+    canonical = rawCat;
+  }
+
   const exp = loadExpenses();
   const id  = Date.now() + Math.random();
-  exp.push({ id, date, amount, category, note: note || '' });
+  exp.push({ id, date, amount, category: canonical, note: note || '' });
   saveExpenses(exp);
-
-  const cats = loadCategories();
-  const trim = (category || '').trim();
-  if(trim && !cats.includes(trim)){
-    cats.push(trim);
-    saveCategories(cats);
-  }
 }
 
 function deleteExpense(id){

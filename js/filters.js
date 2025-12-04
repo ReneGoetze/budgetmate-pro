@@ -1,4 +1,4 @@
-// filters.js – getFilteredExpenses + table + filter modal
+// filters.js
 
 function getFilteredExpenses(){
   let exp = loadExpenses();
@@ -42,68 +42,121 @@ function renderExpenseTable(){
   exp.forEach(e=>{
     total+=Number(e.amount||0);
     const tr=document.createElement('tr');
-    tr.innerHTML=`<td>${e.date||''}</td>
-      <td>${e.category||''}</td>
-      <td>${Number(e.amount||0).toFixed(2)}</td>
-      <td><button class="del-btn" data-id="${e.id}">Del</button></td>`;
+    const dTd=document.createElement('td');
+    dTd.textContent=e.date||'-';
+    const cTd=document.createElement('td');
+    cTd.textContent=e.category||'-';
+    const aTd=document.createElement('td');
+    aTd.textContent=Number(e.amount||0).toFixed(2);
+    const delTd=document.createElement('td');
+    const btn=document.createElement('button');
+    btn.type='button';
+    btn.textContent='Del';
+    btn.className='del-btn';
+    btn.addEventListener('click',()=>{
+      if(!confirm('Do you really want to delete?')) return;
+      deleteExpense(e.id);
+      renderExpenseTable();
+      renderCharts();
+      renderBudgetInfo();
+    });
+    delTd.appendChild(btn);
+    tr.appendChild(dTd);
+    tr.appendChild(cTd);
+    tr.appendChild(aTd);
+    tr.appendChild(delTd);
     tbody.appendChild(tr);
   });
 
-  let periodLabel='All data';
-  if(currentFilter.period==='day') periodLabel='Today';
-  else if(currentFilter.period==='week') periodLabel='This week';
-  else if(currentFilter.period==='month') periodLabel='This month';
-  else if(currentFilter.period==='range') periodLabel='Custom range';
+  if(!exp.length){
+    bar.textContent='No expenses for this selection.';
+    bar.className='summary-bar';
+    return;
+  }
 
-  let catLabel='';
-  if(currentFilter.category!=='all') catLabel=`, category: ${currentFilter.category}`;
-
-  let txt=`Filter: ${periodLabel}${catLabel} • Total: ${total.toFixed(2)} €`;
-  let cls='summary-ok';
-  if(currentFilter.period==='month' && s.monthlyBudget){
-    const mb=Number(s.monthlyBudget);
-    const diff=mb-total;
+  let budget=null;
+  const sel=getSelectedMonthDate();
+  const year=sel.getFullYear();
+  const month=sel.getMonth();
+  const daysInMonth=new Date(year,month+1,0).getDate();
+  if(currentFilter.period==='month'){
+    if(s.monthlyBudget) budget=Number(s.monthlyBudget);
+    else if(s.dailyBudget) budget=Number(s.dailyBudget)*daysInMonth;
+  }else if(currentFilter.period==='day'){
+    if(s.dailyBudget) budget=Number(s.dailyBudget);
+  }else if(currentFilter.period==='week'){
+    if(s.dailyBudget) budget=Number(s.dailyBudget)*7;
+  }
+  let txt=`Entries: ${exp.length} • Sum: ${total.toFixed(2)} €`;
+  if(budget!=null){
+    const diff=budget-total;
     if(diff>=0){
-      txt+=` • ${diff.toFixed(2)} € under monthly budget`;
-      cls='summary-ok';
+      txt+=` • Budget: ${budget.toFixed(2)} € (under by ${diff.toFixed(2)} €)`;
+      bar.className='summary-bar summary-ok';
     }else{
-      txt+=` • ${Math.abs(diff).toFixed(2)} € OVER monthly budget`;
-      cls='summary-warn';
+      txt+=` • Budget: ${budget.toFixed(2)} € (OVER by ${Math.abs(diff).toFixed(2)} €)`;
+      bar.className='summary-bar summary-warn';
     }
+  }else{
+    bar.className='summary-bar';
   }
   bar.textContent=txt;
-  bar.className='summary-bar '+cls;
 }
 
 function openFilterModal(){
   const modal=document.getElementById('filterModal');
-  const periodSel=document.getElementById('filterPeriod');
-  const catSel=document.getElementById('filterCategory');
-  const fromInput=document.getElementById('filterFrom');
-  const toInput=document.getElementById('filterTo');
-  if(!modal||!periodSel||!catSel||!fromInput||!toInput) return;
-
-  periodSel.value=currentFilter.period;
-  fromInput.value=currentFilter.from||'';
-  toInput.value=currentFilter.to||'';
-
-  const all=loadExpenses();
-  const used=[...new Set(all.map(e=>(e.category||'').trim()).filter(Boolean))]
-    .sort((a,b)=>a.localeCompare(b));
-  catSel.innerHTML='';
-  const optAll=document.createElement('option');
-  optAll.value='all'; optAll.textContent='All categories';
-  catSel.appendChild(optAll);
-  used.forEach(c=>{
-    const opt=document.createElement('option');
-    opt.value=c; opt.textContent=c;
-    catSel.appendChild(opt);
-  });
-  catSel.value=currentFilter.category==='all'?'all':currentFilter.category;
-
+  if(!modal) return;
   modal.classList.remove('hidden');
+
+  const pSel=document.getElementById('filterPeriod');
+  const cSel=document.getElementById('filterCategory');
+  const fInput=document.getElementById('filterFrom');
+  const tInput=document.getElementById('filterTo');
+
+  if(pSel) pSel.value=currentFilter.period;
+  if(fInput) fInput.value=currentFilter.from||'';
+  if(tInput) tInput.value=currentFilter.to||'';
+
+  if(cSel){
+    const allExp=loadExpenses();
+    const catsSet=new Set();
+    allExp.forEach(e=>{
+      const cat=(e.category||'').trim();
+      if(cat) catsSet.add(cat);
+    });
+    const cats=Array.from(catsSet).sort((a,b)=>a.localeCompare(b));
+    cSel.innerHTML='<option value="all">All categories</option>';
+    cats.forEach(cat=>{
+      const opt=document.createElement('option');
+      opt.value=cat;
+      opt.textContent=cat;
+      cSel.appendChild(opt);
+    });
+    cSel.value=currentFilter.category;
+  }
 }
-function closeFilterModal(){
+
+function applyFilterFromModal(){
+  const pSel=document.getElementById('filterPeriod');
+  const cSel=document.getElementById('filterCategory');
+  const fInput=document.getElementById('filterFrom');
+  const tInput=document.getElementById('filterTo');
+  currentFilter.period=pSel?pSel.value:'all';
+  currentFilter.category=cSel?cSel.value:'all';
+  currentFilter.from=fInput?fInput.value||null:null;
+  currentFilter.to=tInput?tInput.value||null:null;
+  renderExpenseTable();
   const modal=document.getElementById('filterModal');
   if(modal) modal.classList.add('hidden');
+}
+
+function clearFilter(){
+  currentFilter={period:'all',category:'all',from:null,to:null};
+  renderExpenseTable();
+}
+
+function closeFilterModal(){
+  const modal=document.getElementById('filterModal');
+  if(!modal) return;
+  modal.classList.add('hidden');
 }

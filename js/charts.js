@@ -1,4 +1,4 @@
-// charts.js – build data + render charts + yearly/weekly + month summary
+// charts.js
 
 let monthlyChart, catMonthChart, catWeekChart, catDayChart, trendChart, yearlyChart, weeklyChart;
 
@@ -272,40 +272,89 @@ function renderCharts(){
   if(yearlyChart) yearlyChart.destroy();
   if(weeklyChart) weeklyChart.destroy();
 
+  // Monthly bar colors & cumulative for tooltip
   let barColors=m.values.map(()=>COLOR_NEUTRAL);
   if(s.dailyBudget){
     const db=Number(s.dailyBudget);
     barColors=m.values.map(v=>v<=db?COLOR_GREEN:COLOR_RED);
   }
+  const cumValues=[];
+  let running=0;
+  m.values.forEach(v=>{
+    running+=v;
+    cumValues.push(running);
+  });
+  const selDate=getSelectedMonthDate();
+  const year=selDate.getFullYear();
+  const monthName=MONTHS[selDate.getMonth()];
 
   monthlyChart=new Chart(mCtx,{
     type:'bar',
     data:{labels:m.days,datasets:[{label:'Daily Spending (€)',data:m.values,backgroundColor:barColors}]},
     options:{
-      plugins:{legend:{display:false}},
+      plugins:{
+        legend:{display:false},
+        tooltip:{
+          callbacks:{
+            label:(ctx)=>{
+              const dayLabel=ctx.label;
+              const val=ctx.parsed.y || 0;
+              const cum=cumValues[ctx.dataIndex] || val;
+              return [
+                `${dayLabel}. ${monthName} ${year}: ${val.toFixed(2)} €`,
+                `Cumulative: ${cum.toFixed(2)} €`
+              ];
+            }
+          }
+        }
+      },
       responsive:true,
       maintainAspectRatio:false
     }
   });
 
+  // category colors per category (consistent)
+  const allCatsSet=new Set([...cMonth.labels,...cWeek.labels,...cDay.labels]);
+  const allCats=Array.from(allCatsSet).sort((a,b)=>a.localeCompare(b));
+  const colorByCat={};
+  allCats.forEach((cat,idx)=>{
+    colorByCat[cat]=CATEGORY_COLORS[idx % CATEGORY_COLORS.length];
+  });
+
+  function colorsFor(labels){
+    return labels.map(l=>colorByCat[l] || CATEGORY_COLORS[0]);
+  }
+
   catMonthChart=new Chart(cMonthCtx,{
     type:'doughnut',
-    data:{labels:cMonth.labels,datasets:[{data:cMonth.values}]},
-    options:{plugins:{legend:{display:true}}}
+    data:{labels:cMonth.labels,datasets:[{data:cMonth.values,backgroundColor:colorsFor(cMonth.labels)}]},
+    options:{plugins:{legend:{display:false}}}
   });
   catWeekChart=new Chart(cWeekCtx,{
     type:'doughnut',
-    data:{labels:cWeek.labels,datasets:[{data:cWeek.values}]},
-    options:{plugins:{legend:{display:true}}}
+    data:{labels:cWeek.labels,datasets:[{data:cWeek.values,backgroundColor:colorsFor(cWeek.labels)}]},
+    options:{plugins:{legend:{display:false}}}
   });
   catDayChart=new Chart(cDayCtx,{
     type:'doughnut',
-    data:{labels:cDay.labels,datasets:[{data:cDay.values}]},
-    options:{plugins:{legend:{display:true}}}
+    data:{labels:cDay.labels,datasets:[{data:cDay.values,backgroundColor:colorsFor(cDay.labels)}]},
+    options:{plugins:{legend:{display:false}}}
   });
 
+  // Render combined legend
+  const legendDiv=document.getElementById('categoryLegend');
+  if(legendDiv){
+    legendDiv.innerHTML='';
+    allCats.forEach(cat=>{
+      const color=colorByCat[cat] || CATEGORY_COLORS[0];
+      const span=document.createElement('span');
+      span.className='legend-item';
+      span.innerHTML=`<span class="legend-color" style="background:${color}"></span>${cat}`;
+      legendDiv.appendChild(span);
+    });
+  }
+
   const cmTotal=currentMonthTotal(all);
-  const selDate=getSelectedMonthDate();
   const daysInMonth=new Date(selDate.getFullYear(),selDate.getMonth()+1,0).getDate();
   let limit=null;
   if(s.monthlyBudget) limit=Number(s.monthlyBudget);
@@ -313,9 +362,10 @@ function renderCharts(){
   let lineColor=COLOR_NEUTRAL;
   if(limit!=null) lineColor=cmTotal<=limit?COLOR_GREEN:COLOR_RED;
 
+  const tColor=lineColor;
   trendChart=new Chart(tCtx,{
     type:'line',
-    data:{labels:trend.labels,datasets:[{label:'Monthly Total (€)',data:trend.values,borderColor:lineColor,backgroundColor:lineColor,tension:0.2}]},
+    data:{labels:trend.labels,datasets:[{label:'Monthly Total (€)',data:trend.values,borderColor:tColor,backgroundColor:tColor,tension:0.2}]},
     options:{
       plugins:{legend:{display:false}},
       responsive:true,
@@ -327,7 +377,6 @@ function renderCharts(){
   updateMonthSummary(monthExp,s);
   updateMonthChangeAndProjection(monthExp,s);
 
-  const year=selDate.getFullYear();
   const yData=buildYearlyData(all,year,s);
   yearlyChart=new Chart(yCtx,{
     type:'bar',

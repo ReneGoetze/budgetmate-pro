@@ -1,224 +1,108 @@
-// main.js – wire up everything on DOMContentLoaded
+// main.js
 
 document.addEventListener('DOMContentLoaded',()=>{
-  const form=document.getElementById('expenseForm');
-  const dateInput=document.getElementById('date');
-  if(dateInput) dateInput.value=todayDate();
-
-  const s=loadSettings();
-  document.body.classList.toggle('dark',!!s.darkMode);
-  const dailyInput=document.getElementById('dailyBudget');
-  const monthlyInput=document.getElementById('monthlyBudget');
-  if(dailyInput) dailyInput.value=s.dailyBudget!=null?s.dailyBudget:'';
-  if(monthlyInput) monthlyInput.value=s.monthlyBudget!=null?s.monthlyBudget:'';
-  const toggle=document.getElementById('darkToggle');
-  if(toggle) toggle.textContent=s.darkMode?'Light mode':'Dark mode';
-
+  applyDarkMode();
+  loadBudgetToUI();
   populateMonthYearSelectors();
-  renderBudgetInfo();
   renderCategoryList();
   renderCategoryManager();
   renderCharts();
+  renderBudgetInfo();
   renderExpenseTable();
 
-  document.querySelectorAll('.cat-btn').forEach(btn=>{
-    btn.addEventListener('click',()=>{
-      const cat=btn.dataset.cat || btn.getAttribute('data-cat');
-      const inp=document.getElementById('category');
-      if(inp && cat) inp.value=cat;
-    });
-  });
-
-  if(toggle){
-    toggle.addEventListener('click',()=>{
-      const st=loadSettings();
-      st.darkMode=!st.darkMode;
-      saveSettings(st);
-      document.body.classList.toggle('dark',!!st.darkMode);
-      toggle.textContent=st.darkMode?'Light mode':'Dark mode';
-    });
-  }
-
-  const saveBudgetBtn=document.getElementById('saveBudget');
-  if(saveBudgetBtn){
-    saveBudgetBtn.addEventListener('click',()=>{
-      const st=loadSettings();
-      const dv=document.getElementById('dailyBudget').value;
-      const mv=document.getElementById('monthlyBudget').value;
-      const hasDaily = dv && !isNaN(parseFloat(dv)) && parseFloat(dv) > 0;
-      const hasMonthly = mv && !isNaN(parseFloat(mv)) && parseFloat(mv) > 0;
-
-      if(hasDaily && hasMonthly){
-        alert('Please enter EITHER a daily OR a monthly budget, not both.');
-        return;
-      }
-
-      st.dailyBudget = hasDaily ? parseFloat(dv) : null;
-      st.monthlyBudget = hasMonthly ? parseFloat(mv) : null;
-
-      saveSettings(st);
-      renderBudgetInfo();
-      renderExpenseTable();
-      renderCharts();
-      alert('Budget saved.');
-    });
-  }
-
-  const tbody=document.querySelector('#expenseTable tbody');
-  if(tbody){
-    tbody.addEventListener('click',e=>{
-      const target=e.target;
-      if(target && target.classList.contains('del-btn')){
-        const idStr=target.getAttribute('data-id');
-        if(!idStr) return;
-        if(!confirm('Do you really want to delete?\n\nYes = delete this single expense.\nNo = keep it.')) return;
-        const idNum=Number(idStr);
-        deleteExpense(idNum);
-        renderCharts();
-        renderExpenseTable();
-        renderBudgetInfo();
-      }
-    });
-  }
-
-  const deleteAllBtn=document.getElementById('deleteAll');
-  if(deleteAllBtn){
-    deleteAllBtn.addEventListener('click',()=>{
-      const msg='DELETE ALL EXPENSE DATA\n\nThis will delete:\n• all saved expenses\n• all saved categories\n\nBudgets & settings will stay.\n\nAre you sure?\nYes = delete all\nNo = cancel';
-      if(!confirm(msg)) return;
-      saveExpenses([]);
-      saveCategories([]);
-      renderCategoryList();
-      renderCategoryManager();
-      renderCharts();
-      renderExpenseTable();
-      renderBudgetInfo();
-    });
-  }
-
-  const newRulesBtn=document.getElementById('newRules');
-  if(newRulesBtn){
-    newRulesBtn.addEventListener('click',()=>{
-      if(!confirm('Do you really want to change the rules?')) return;
-      const rulesCard=document.getElementById('rulesCard');
-      if(rulesCard) rulesCard.scrollIntoView({behavior:'smooth'});
-      alert('You can now adjust categories in the "Rules & Settings" section. Budgets can be changed in the Budget section at the top.');
-    });
-  }
-
-  const printBtn=document.getElementById('printReport');
-  if(printBtn){
-    printBtn.addEventListener('click',()=>{ printReport(); });
-  }
-  const exportMonthBtn=document.getElementById('exportMonthPdf');
-  if(exportMonthBtn){
-    exportMonthBtn.addEventListener('click',()=>{ exportMonthPdf(); });
-  }
-
-  const thDate=document.getElementById('thDate');
-  const thCategory=document.getElementById('thCategory');
-  if(thDate) thDate.addEventListener('click',openFilterModal);
-  if(thCategory) thCategory.addEventListener('click',openFilterModal);
-
-  const modal=document.getElementById('filterModal');
-  const closeFilterBtn=document.getElementById('closeFilter');
-  const applyFilterBtn=document.getElementById('applyFilter');
-  const clearFilterBtn=document.getElementById('clearFilter');
-  const periodSel=document.getElementById('filterPeriod');
-  const catSel=document.getElementById('filterCategory');
-  const fromInput=document.getElementById('filterFrom');
-  const toInput=document.getElementById('filterTo');
-
-  if(closeFilterBtn){
-    closeFilterBtn.addEventListener('click',()=>{ closeFilterModal(); });
-  }
-  if(modal){
-    const backdrop=modal.querySelector('.modal-backdrop');
-    if(backdrop) backdrop.addEventListener('click',()=>{ closeFilterModal(); });
-  }
-  if(applyFilterBtn){
-    applyFilterBtn.addEventListener('click',()=>{
-      if(periodSel) currentFilter.period=periodSel.value;
-      if(catSel) currentFilter.category=catSel.value;
-      if(periodSel && periodSel.value==='range'){
-        currentFilter.from=fromInput.value||null;
-        currentFilter.to=toInput.value||null;
-      }else{
-        currentFilter.from=null;
-        currentFilter.to=null;
-      }
-      closeFilterModal();
-      renderCharts();
-      renderExpenseTable();
-    });
-  }
-  if(clearFilterBtn){
-    clearFilterBtn.addEventListener('click',()=>{
-      currentFilter={period:'all',category:'all',from:null,to:null};
-      closeFilterModal();
-      renderCharts();
-      renderExpenseTable();
-    });
-  }
-
-  const prevMonthBtn=document.getElementById('prevMonth');
-  const nextMonthBtn=document.getElementById('nextMonth');
-  const todayBtn=document.getElementById('todayMonth');
-  const monthSelect=document.getElementById('monthSelect');
-  const yearSelect=document.getElementById('yearSelect');
-
-  if(prevMonthBtn){
-    prevMonthBtn.addEventListener('click',()=>{
-      monthOffset--;
-      renderCharts();
-      renderExpenseTable();
-    });
-  }
-  if(nextMonthBtn){
-    nextMonthBtn.addEventListener('click',()=>{
-      if(monthOffset<0){
-        monthOffset++;
-        renderCharts();
-        renderExpenseTable();
-      }
-    });
-  }
-  if(todayBtn){
-    todayBtn.addEventListener('click',()=>{
-      monthOffset=0;
-      renderCharts();
-      renderExpenseTable();
-    });
-  }
-  if(monthSelect){
-    monthSelect.addEventListener('change',()=>{ setMonthYearFromSelectors(); });
-  }
-  if(yearSelect){
-    yearSelect.addEventListener('change',()=>{ setMonthYearFromSelectors(); });
-  }
-
+  const form=document.getElementById('expenseForm');
   if(form){
     form.addEventListener('submit',e=>{
       e.preventDefault();
-      const date=dateInput.value;
-      const amountVal=document.getElementById('amount').value;
+      const date=document.getElementById('date').value;
+      const amount=parseFloat(document.getElementById('amount').value||'0');
       const category=document.getElementById('category').value;
       const note=document.getElementById('note').value;
-      if(!date || !amountVal || !category){
-        alert('Please fill in date, amount and category.');return;
-      }
-      const amount=parseFloat(amountVal);
-      if(!isFinite(amount) || amount<=0){
-        alert('Amount must be a positive number.');return;
+      if(!date || !amount || !category){
+        alert('Please enter date, amount and category.');
+        return;
       }
       addExpense(date,amount,category,note);
       form.reset();
-      dateInput.value=todayDate();
+      document.getElementById('date').value=todayDate();
       renderCategoryList();
       renderCategoryManager();
       renderCharts();
       renderExpenseTable();
       renderBudgetInfo();
     });
+    document.getElementById('date').value=todayDate();
   }
+
+  const fixed=document.getElementById('fixedCategories');
+  if(fixed){
+    fixed.querySelectorAll('.cat-btn').forEach(btn=>{
+      btn.addEventListener('click',()=>{
+        const val=btn.dataset.cat;
+        const inp=document.getElementById('category');
+        if(inp) inp.value=val;
+      });
+    });
+  }
+
+  const saveBtn=document.getElementById('saveBudget');
+  if(saveBtn) saveBtn.addEventListener('click',saveBudgetFromUI);
+
+  const darkBtn=document.getElementById('darkToggle');
+  if(darkBtn) darkBtn.addEventListener('click',()=>{
+    toggleDarkMode();
+    renderCharts();
+  });
+
+  const prevBtn=document.getElementById('prevMonth');
+  const nextBtn=document.getElementById('nextMonth');
+  const todayBtn=document.getElementById('todayMonth');
+  if(prevBtn) prevBtn.addEventListener('click',()=>{monthOffset--;renderCharts();renderExpenseTable();});
+  if(nextBtn) nextBtn.addEventListener('click',()=>{if(monthOffset<0){monthOffset++;renderCharts();renderExpenseTable();}});
+  if(todayBtn) todayBtn.addEventListener('click',()=>{monthOffset=0;renderCharts();renderExpenseTable();});
+
+  const mSel=document.getElementById('monthSelect');
+  const ySel=document.getElementById('yearSelect');
+  if(mSel) mSel.addEventListener('change',setMonthYearFromSelectors);
+  if(ySel) ySel.addEventListener('change',setMonthYearFromSelectors);
+
+  const printBtn=document.getElementById('printReport');
+  if(printBtn) printBtn.addEventListener('click',printReport);
+
+  const expMonthBtn=document.getElementById('exportMonthPdf');
+  if(expMonthBtn) expMonthBtn.addEventListener('click',exportMonthPdf);
+
+  const delAllBtn=document.getElementById('deleteAll');
+  if(delAllBtn) delAllBtn.addEventListener('click',()=>{
+    if(!confirm('Do you really want to delete ALL expenses?')) return;
+    saveExpenses([]);
+    renderExpenseTable();
+    renderCharts();
+    renderBudgetInfo();
+  });
+
+  const rulesBtn=document.getElementById('newRules');
+  if(rulesBtn) rulesBtn.addEventListener('click',handleNewRules);
+
+  const exportCsvBtn=document.getElementById('exportCsv');
+  if(exportCsvBtn) exportCsvBtn.addEventListener('click',exportCsv);
+
+  const thDate=document.getElementById('thDate');
+  const thCategory=document.getElementById('thCategory');
+  if(thDate) thDate.addEventListener('click',()=>{
+    currentFilter.period='day';
+    currentFilter.from=null;
+    currentFilter.to=null;
+    renderExpenseTable();
+  });
+  if(thCategory) thCategory.addEventListener('click',()=>{
+    openFilterModal();
+  });
+
+  const applyFilterBtn=document.getElementById('applyFilter');
+  const clearFilterBtn=document.getElementById('clearFilter');
+  const closeFilterBtn=document.getElementById('closeFilter');
+  if(applyFilterBtn) applyFilterBtn.addEventListener('click',applyFilterFromModal);
+  if(clearFilterBtn) clearFilterBtn.addEventListener('click',()=>{clearFilter();closeFilterModal();});
+  if(closeFilterBtn) closeFilterBtn.addEventListener('click',closeFilterModal);
 });
