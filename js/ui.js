@@ -55,7 +55,7 @@ function restoreDarkModeAfterExport(wasDark){
   if(wasDark){document.body.classList.add('dark');updateDarkModeButtonLabel();}
 }
 
-// Mehrseitiger Screenshot: eine Seite pro Card (.header + .card)
+// Mehrseitiger Screenshot der kompletten Seite
 async function captureFullPagePdf(filename){
   const container=document.querySelector('.container');
   if(!container){
@@ -76,11 +76,9 @@ async function captureFullPagePdf(filename){
     return;
   }
   let pageIndex=0;
-
   for(const card of cards){
     const canvas=await html2canvas(card,{scale:2,useCORS:true});
-    const imgWidth=contentWidth;
-    const scale=imgWidth/canvas.width;
+    const scale=contentWidth/canvas.width;
     const pageHeightMm=pageHeight-2*margin;
     const pageHeightPx=pageHeightMm/scale;
     let renderedHeight=0;
@@ -92,6 +90,7 @@ async function captureFullPagePdf(filename){
       ctx.drawImage(canvas,0,renderedHeight,canvas.width,pageCanvas.height,0,0,canvas.width,pageCanvas.height);
       const imgData=pageCanvas.toDataURL('image/png');
       if(pageIndex>0||renderedHeight>0)pdf.addPage();
+      const imgWidth=contentWidth;
       const imgHeight=pageCanvas.height*scale;
       const x=margin;
       const y=margin;
@@ -102,7 +101,6 @@ async function captureFullPagePdf(filename){
   }
   pdf.save(filename);
 }
-
 async function printReport(){
   const wasDark=ensureLightModeForExport();
   try{

@@ -258,8 +258,6 @@ function renderCharts(){
   const monthName=MONTHS[selDate.getMonth()];
 
   monthlyChart=new Chart(mCtx,{
-    // expose on window for PDF export
-    window.monthlyChart=monthlyChart;
     type:'bar',
     data:{labels:m.days,datasets:[{label:'Daily Spending (€)',data:m.values,backgroundColor:barColors}]},
     options:{
@@ -284,19 +282,16 @@ function renderCharts(){
   function colorsFor(labels){return labels.map(l=>colorMap[l]||CATEGORY_COLORS[0]);}
 
   catMonthChart=new Chart(cMonthCtx,{
-    window.catMonthChart=catMonthChart;
     type:'doughnut',
     data:{labels:cMonth.labels,datasets:[{data:cMonth.values,backgroundColor:colorsFor(cMonth.labels)}]},
     options:{plugins:{legend:{display:false}}}
   });
   catWeekChart=new Chart(cWeekCtx,{
-    window.catWeekChart=catWeekChart;
     type:'doughnut',
     data:{labels:cWeek.labels,datasets:[{data:cWeek.values,backgroundColor:colorsFor(cWeek.labels)}]},
     options:{plugins:{legend:{display:false}}}
   });
   catDayChart=new Chart(cDayCtx,{
-    window.catDayChart=catDayChart;
     type:'doughnut',
     data:{labels:cDay.labels,datasets:[{data:cDay.values,backgroundColor:colorsFor(cDay.labels)}]},
     options:{plugins:{legend:{display:false}}}
@@ -324,7 +319,6 @@ function renderCharts(){
   if(limit!=null)lineColor=cmTotal<=limit?COLOR_GREEN:COLOR_RED;
 
   trendChart=new Chart(tCtx,{
-    window.trendChart=trendChart;
     type:'line',
     data:{labels:trend.labels,datasets:[{label:'Monthly Total (€)',data:trend.values,borderColor:lineColor,backgroundColor:lineColor,tension:0.2}]},
     options:{plugins:{legend:{display:false}},responsive:true,maintainAspectRatio:false}
@@ -336,7 +330,6 @@ function renderCharts(){
 
   const yData=buildYearlyData(all,year,s);
   yearlyChart=new Chart(yCtx,{
-    window.yearlyChart=yearlyChart;
     type:'bar',
     data:{labels:yData.labels,datasets:[{label:'Monthly total (€)',data:yData.values,backgroundColor:yData.colors}]},
     options:{plugins:{legend:{display:false}},responsive:true,maintainAspectRatio:false}
@@ -374,7 +367,6 @@ function renderCharts(){
 
   const wData=buildWeeklyData(all);
   weeklyChart=new Chart(wCtx,{
-    window.weeklyChart=weeklyChart;
     type:'bar',
     data:{labels:wData.labels,datasets:[{label:'Weekly total (€)',data:wData.values,backgroundColor:COLOR_LIGHT_BLUE}]},
     options:{plugins:{legend:{display:false}},responsive:true,maintainAspectRatio:false}
@@ -386,5 +378,14 @@ function renderCharts(){
       'Worst (highest): '+wData.worstLabel+' ('+wData.worstVal.toFixed(2)+' €)';
   }
 
+  if(typeof window!=='undefined'){ 
+    window.monthlyChart=monthlyChart;
+    window.catMonthChart=catMonthChart;
+    window.catWeekChart=catWeekChart;
+    window.catDayChart=catDayChart;
+    window.trendChart=trendChart;
+    window.yearlyChart=yearlyChart;
+    window.weeklyChart=weeklyChart;
+  }
   renderFavoriteCategories();
 }
