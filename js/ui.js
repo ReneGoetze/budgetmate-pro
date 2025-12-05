@@ -54,34 +54,59 @@ function ensureLightModeForExport(){
 function restoreDarkModeAfterExport(wasDark){
   if(wasDark){document.body.classList.add('dark');updateDarkModeButtonLabel();}
 }
+
+// Mehrseitiger Screenshot der kompletten Seite
 async function captureFullPagePdf(filename){
   const container=document.querySelector('.container');
-  if(!container)return;
+  if(!container){
+    alert('Container not found.');
+    return;
+  }
   if(typeof html2canvas==='undefined'||typeof window.jspdf==='undefined'){
     alert('PDF export is not available.');
     return;
   }
-  const{jsPDF}=window.jspdf;
-  const canvas=await html2canvas(container,{scale:2,useCORS:true});
-  const imgData=canvas.toDataURL('image/png');
+  const { jsPDF } = window.jspdf;
   const pdf=new jsPDF('p','mm','a4');
   const pageWidth=210,pageHeight=297,margin=10;
-  const availableWidth=pageWidth-2*margin,availableHeight=pageHeight-2*margin;
-  let imgWidth=availableWidth,imgHeight=canvas.height*imgWidth/canvas.width;
-  if(imgHeight>availableHeight){
-    const ratio=availableHeight/imgHeight;
-    imgWidth*=ratio;imgHeight*=ratio;
+  const contentWidth=pageWidth-2*margin;
+  const canvas=await html2canvas(container,{scale:2,useCORS:true});
+  const imgWidth=contentWidth;
+  const pageHeightMm=pageHeight-2*margin;
+  const scale=imgWidth/canvas.width;
+  const pageHeightPx=pageHeightMm/scale;
+  let renderedHeight=0;
+  let pageIndex=0;
+
+  while(renderedHeight<canvas.height){
+    const pageCanvas=document.createElement('canvas');
+    pageCanvas.width=canvas.width;
+    pageCanvas.height=Math.min(pageHeightPx,canvas.height-renderedHeight);
+    const ctx=pageCanvas.getContext('2d');
+    ctx.drawImage(canvas,0,renderedHeight,canvas.width,pageCanvas.height,0,0,canvas.width,pageCanvas.height);
+    const imgData=pageCanvas.toDataURL('image/png');
+    if(pageIndex>0)pdf.addPage();
+    const imgHeight=pageCanvas.height*scale;
+    const x=margin;
+    const y=margin;
+    pdf.addImage(imgData,'PNG',x,y,imgWidth,imgHeight);
+    renderedHeight+=pageCanvas.height;
+    pageIndex++;
   }
-  const x=margin+(availableWidth-imgWidth)/2;
-  const y=margin+(availableHeight-imgHeight)/2;
-  pdf.addImage(imgData,'PNG',x,y,imgWidth,imgHeight);
   pdf.save(filename);
 }
+
 async function printReport(){
   const wasDark=ensureLightModeForExport();
-  const dateStr=new Date().toISOString().slice(0,10);
-  await captureFullPagePdf('BudgetMate_full_'+dateStr+'.pdf');
-  restoreDarkModeAfterExport(wasDark);
+  try{
+    const dateStr=new Date().toISOString().slice(0,10);
+    await captureFullPagePdf('BudgetMate_full_'+dateStr+'.pdf');
+  }catch(err){
+    console.error(err);
+    alert('Error while creating PDF. Please try again.');
+  }finally{
+    restoreDarkModeAfterExport(wasDark);
+  }
 }
 
 function buildMonthBudgetSummaryForPdf(monthExp,settings){
@@ -118,111 +143,129 @@ async function exportMonthPdf(){
     return;
   }
   const wasDark=ensureLightModeForExport();
-  const all=loadExpenses();
-  const mk=getSelectedMonthKey();
-  const monthExp=all.filter(e=>(e.date||'').startsWith(mk));
-  const settings=loadSettings();
-  const{jsPDF}=window.jspdf;
-  const pdf=new jsPDF('p','mm','a4');
-  const pageWidth=210,pageHeight=297,margin=10;
-  let y=margin;
+  try{
+    const all=loadExpenses();
+    const mk=getSelectedMonthKey();
+    const monthExp=all.filter(e=>(e.date||'').startsWith(mk));
+    const settings=loadSettings();
+    const { jsPDF } = window.jspdf;
+    const pdf=new jsPDF('p','mm','a4');
+    const pageWidth=210,pageHeight=297,margin=10;
+    let y=margin;
 
-  const sel=getSelectedMonthDate();
-  const title='BudgetMate – Monthly Report: '+MONTHS[sel.getMonth()]+' '+sel.getFullYear();
-  pdf.setFontSize(16);
-  pdf.text(title,pageWidth/2,y,{align:'center'});
-  y+=8;
+    const sel=getSelectedMonthDate();
+    const title='BudgetMate – Monthly Report: '+MONTHS[sel.getMonth()]+' '+sel.getFullYear();
+    pdf.setFontSize(16);
+    pdf.text(title,pageWidth/2,y,{align:'center'});
+    y+=8;
 
-  pdf.setFontSize(10);
-  const budgetInfo=buildMonthBudgetSummaryForPdf(monthExp,settings);
-  budgetInfo.lines.forEach(line=>{pdf.text(line,margin,y);y+=5;});
+    pdf.setFontSize(10);
+    const budgetInfo=buildMonthBudgetSummaryForPdf(monthExp,settings);
+    budgetInfo.lines.forEach(line=>{pdf.text(line,margin,y);y+=5;});
 
-  const monthSummaryEl=document.getElementById('monthSummary');
-  const monthChangeEl=document.getElementById('monthChange');
-  const monthProjectionEl=document.getElementById('monthProjection');
-  const extraLines=[];
-  if(monthSummaryEl&&monthSummaryEl.textContent)extraLines.push(monthSummaryEl.textContent);
-  if(monthChangeEl&&monthChangeEl.textContent)extraLines.push(monthChangeEl.textContent);
-  if(monthProjectionEl&&monthProjectionEl.textContent)extraLines.push(monthProjectionEl.textContent);
-  if(extraLines.length){
-    y+=3;
-    extraLines.forEach(line=>{
-      const splitted=pdf.splitTextToSize(line,pageWidth-2*margin);
-      pdf.text(splitted,margin,y);
-      y+=5*splitted.length;
-    });
-  }
-  y+=4;
-
-  if(window.monthlyChart){
-    const imgData=window.monthlyChart.toBase64Image();
-    const imgWidth=pageWidth-2*margin;
-    const imgHeight=imgWidth*0.4;
-    if(y+imgHeight>pageHeight-margin){pdf.addPage();y=margin;}
-    pdf.text('Monthly spending (bar chart)',margin,y);y+=5;
-    pdf.addImage(imgData,'PNG',margin,y,imgWidth,imgHeight);y+=imgHeight+6;
-  }
-  if(window.catMonthChart){
-    const imgData=window.catMonthChart.toBase64Image();
-    const imgWidth=pageWidth/2;
-    const imgHeight=imgWidth*0.8;
-    if(y+imgHeight>pageHeight-margin){pdf.addPage();y=margin;}
-    pdf.text('Monthly categories (pie chart)',margin,y);y+=5;
-    pdf.addImage(imgData,'PNG',margin,y,imgWidth,imgHeight);y+=imgHeight+6;
-  }
-
-  const cats=loadCategories().slice().sort((a,b)=>a.localeCompare(b));
-  const colorMap=getCategoryColorMap();
-  if(cats.length){
-    if(y+10>pageHeight-margin){pdf.addPage();y=margin;}
-    pdf.setFontSize(11);pdf.text('Category legend',margin,y);y+=4;
-    pdf.setFontSize(9);
-    cats.forEach(cat=>{
-      const color=colorMap[cat]||CATEGORY_COLORS[0];
-      const hex=color.replace('#','');
-      const r=parseInt(hex.substring(0,2),16);
-      const g=parseInt(hex.substring(2,4),16);
-      const b=parseInt(hex.substring(4,6),16);
-      if(y+5>pageHeight-margin){pdf.addPage();y=margin;}
-      pdf.setFillColor(r,g,b);
-      pdf.rect(margin,y-3,4,4,'F');
-      pdf.setTextColor(0,0,0);
-      pdf.text(' '+cat,margin+6,y);
-      y+=5;
-    });
-  }
-
-  if(monthExp.length){
-    if(y+10>pageHeight-margin){pdf.addPage();y=margin;}
-    pdf.setFontSize(11);pdf.text('Monthly expenses (details)',margin,y);y+=6;
-    pdf.setFontSize(9);
-    const colWidths=[25,60,25,80];
-    const headers=['Date','Category','Amount','Note'];
-    function drawHeader(){
-      let x=margin;
-      headers.forEach((h,i)=>{pdf.text(h,x,y);x+=colWidths[i];});
-      y+=4;pdf.line(margin,y,pageWidth-margin,y);y+=2;
-    }
-    drawHeader();
-    monthExp.sort((a,b)=>(a.date||'').localeCompare(b.date||''));
-    monthExp.forEach(e=>{
-      if(y+6>pageHeight-margin){pdf.addPage();y=margin;drawHeader();}
-      let x=margin;
-      const row=[e.date||'',e.category||'',Number(e.amount||0).toFixed(2),e.note||''];
-      row.forEach((val,i)=>{
-        const cellWidth=colWidths[i];
-        const text=pdf.splitTextToSize(String(val),cellWidth-1);
-        pdf.text(text,x,y);
-        x+=cellWidth;
+    const monthSummaryEl=document.getElementById('monthSummary');
+    const monthChangeEl=document.getElementById('monthChange');
+    const monthProjectionEl=document.getElementById('monthProjection');
+    const extraLines=[];
+    if(monthSummaryEl&&monthSummaryEl.textContent)extraLines.push(monthSummaryEl.textContent);
+    if(monthChangeEl&&monthChangeEl.textContent)extraLines.push(monthChangeEl.textContent);
+    if(monthProjectionEl&&monthProjectionEl.textContent)extraLines.push(monthProjectionEl.textContent);
+    if(extraLines.length){
+      y+=3;
+      extraLines.forEach(line=>{
+        const splitted=pdf.splitTextToSize(line,pageWidth-2*margin);
+        pdf.text(splitted,margin,y);
+        y+=5*splitted.length;
       });
-      y+=6;
-    });
-  }
+    }
+    y+=4;
 
-  const fileMonth=MONTHS[sel.getMonth()];
-  const filename='BudgetMate_month_'+fileMonth+'_'+sel.getFullYear()+'.pdf';
-  pdf.save(filename);
-  restoreDarkModeAfterExport(wasDark);
+    // Monats-Bar-Chart (falls vorhanden)
+    if(window.monthlyChart && typeof window.monthlyChart.toBase64Image==='function'){
+      const imgData=window.monthlyChart.toBase64Image();
+      if(imgData){
+        const imgWidth=pageWidth-2*margin;
+        const imgHeight=imgWidth*0.4;
+        if(y+imgHeight>pageHeight-margin){pdf.addPage();y=margin;}
+        pdf.text('Monthly spending (bar chart)',margin,y);y+=5;
+        pdf.addImage(imgData,'PNG',margin,y,imgWidth,imgHeight);y+=imgHeight+6;
+      }
+    }
+
+    // Monats-Pie-Chart (Categories Month)
+    if(window.catMonthChart && typeof window.catMonthChart.toBase64Image==='function'){
+      const imgData=window.catMonthChart.toBase64Image();
+      if(imgData){
+        const imgWidth=pageWidth/2;
+        const imgHeight=imgWidth*0.8;
+        if(y+imgHeight>pageHeight-margin){pdf.addPage();y=margin;}
+        pdf.text('Monthly categories (pie chart)',margin,y);y+=5;
+        pdf.addImage(imgData,'PNG',margin,y,imgWidth,imgHeight);y+=imgHeight+6;
+      }
+    }
+
+    // Kategorien-Legende
+    const cats=loadCategories().slice().sort((a,b)=>a.localeCompare(b));
+    const colorMap=getCategoryColorMap();
+    if(cats.length){
+      if(y+10>pageHeight-margin){pdf.addPage();y=margin;}
+      pdf.setFontSize(11);pdf.text('Category legend',margin,y);y+=4;
+      pdf.setFontSize(9);
+      cats.forEach(cat=>{
+        const color=colorMap[cat]||'#3B82F6';
+        const hex=color.replace('#','');
+        let r=59,g=130,b=246;
+        if(hex.length===6){
+          r=parseInt(hex.substring(0,2),16);
+          g=parseInt(hex.substring(2,4),16);
+          b=parseInt(hex.substring(4,6),16);
+        }
+        if(y+5>pageHeight-margin){pdf.addPage();y=margin;}
+        pdf.setFillColor(r,g,b);
+        pdf.rect(margin,y-3,4,4,'F');
+        pdf.setTextColor(0,0,0);
+        pdf.text(' '+cat,margin+6,y);
+        y+=5;
+      });
+    }
+
+    // Monats-Einzelpositionen
+    if(monthExp.length){
+      if(y+10>pageHeight-margin){pdf.addPage();y=margin;}
+      pdf.setFontSize(11);pdf.text('Monthly expenses (details)',margin,y);y+=6;
+      pdf.setFontSize(9);
+      const colWidths=[25,60,25,80];
+      const headers=['Date','Category','Amount','Note'];
+      function drawHeader(){
+        let x=margin;
+        headers.forEach((h,i)=>{pdf.text(h,x,y);x+=colWidths[i];});
+        y+=4;pdf.line(margin,y,pageWidth-margin,y);y+=2;
+      }
+      drawHeader();
+      monthExp.sort((a,b)=>(a.date||'').localeCompare(b.date||''));
+      monthExp.forEach(e=>{
+        if(y+6>pageHeight-margin){pdf.addPage();y=margin;drawHeader();}
+        let x=margin;
+        const row=[e.date||'',e.category||'',Number(e.amount||0).toFixed(2),e.note||''];
+        row.forEach((val,i)=>{
+          const cellWidth=colWidths[i];
+          const text=pdf.splitTextToSize(String(val),cellWidth-1);
+          pdf.text(text,x,y);
+          x+=cellWidth;
+        });
+        y+=6;
+      });
+    }
+
+    const fileMonth=MONTHS[sel.getMonth()];
+    const filename='BudgetMate_month_'+fileMonth+'_'+sel.getFullYear()+'.pdf';
+    pdf.save(filename);
+  }catch(err){
+    console.error(err);
+    alert('Error while creating monthly PDF. Please try again.');
+  }finally{
+    restoreDarkModeAfterExport(wasDark);
+  }
 }
 
 function exportCsv(){
