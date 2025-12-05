@@ -31,10 +31,10 @@ function renderBudgetInfo(){
   }
 
   const parts = [];
-  if(s.dailyBudget) parts.push(`Daily: ${Number(s.dailyBudget).toFixed(2)} €`);
-  if(s.monthlyBudget) parts.push(`Monthly: ${Number(s.monthlyBudget).toFixed(2)} €`);
+  if(s.dailyBudget) parts.push('Daily: ' + Number(s.dailyBudget).toFixed(2) + ' €');
+  if(s.monthlyBudget) parts.push('Monthly: ' + Number(s.monthlyBudget).toFixed(2) + ' €');
   if(remaining!=null){
-    parts.push(`Remaining this month: ${remaining.toFixed(2)} € (${methodText})`);
+    parts.push('Remaining this month: ' + remaining.toFixed(2) + ' € (' + methodText + ')');
   }
   info.textContent = parts.join(' • ');
 
@@ -52,12 +52,12 @@ function renderBudgetInfo(){
 
   const allowed = Number(s.dailyBudget)*day;
   const diff = allowed - spentSoFar;
-  let txt = `Cumulative spending: ${spentSoFar.toFixed(2)} € • Allowed so far (${day} days): ${allowed.toFixed(2)} €`;
+  let txt = 'Cumulative spending: ' + spentSoFar.toFixed(2) + ' € • Allowed so far (' + day + ' days): ' + allowed.toFixed(2) + ' €';
   if(diff>=0){
-    txt += ` • Status: under by ${diff.toFixed(2)} €`;
+    txt += ' • Status: under by ' + diff.toFixed(2) + ' €';
     cumBox.className = 'cum-box cum-ok';
   }else{
-    txt += ` • Status: OVER by ${Math.abs(diff).toFixed(2)} €`;
+    txt += ' • Status: OVER by ' + Math.abs(diff).toFixed(2) + ' €';
     cumBox.className = 'cum-box cum-warn';
   }
   cumBox.textContent = txt;

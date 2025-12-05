@@ -87,14 +87,14 @@ function renderExpenseTable(){
   }else if(currentFilter.period==='week'){
     if(s.dailyBudget) budget=Number(s.dailyBudget)*7;
   }
-  let txt=`Entries: ${exp.length} • Sum: ${total.toFixed(2)} €`;
+  let txt='Entries: ' + exp.length + ' • Sum: ' + total.toFixed(2) + ' €';
   if(budget!=null){
     const diff=budget-total;
     if(diff>=0){
-      txt+=` • Budget: ${budget.toFixed(2)} € (under by ${diff.toFixed(2)} €)`;
+      txt+=' • Budget: ' + budget.toFixed(2) + ' € (under by ' + diff.toFixed(2) + ' €)';
       bar.className='summary-bar summary-ok';
     }else{
-      txt+=` • Budget: ${budget.toFixed(2)} € (OVER by ${Math.abs(diff).toFixed(2)} €)`;
+      txt+=' • Budget: ' + budget.toFixed(2) + ' € (OVER by ' + Math.abs(diff).toFixed(2) + ' €)';
       bar.className='summary-bar summary-warn';
     }
   }else{

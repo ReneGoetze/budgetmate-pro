@@ -153,6 +153,12 @@ body.dark .del-btn{
 .cat-chart{
   flex:1 1 150px;
 }
+.cat-small{
+  flex:1 1 150px;
+}
+.cat-large{
+  flex:1 1 100%;
+}
 .cat-chart canvas{
   padding:4px;
 }
@@ -170,6 +176,16 @@ body.dark .del-btn{
   align-items:center;
   justify-content:space-between;
   padding:2px 0;
+}
+.cat-item-left{
+  display:flex;
+  align-items:center;
+  gap:6px;
+}
+.cat-color-dot{
+  width:10px;
+  height:10px;
+  border-radius:999px;
 }
 .cat-item-buttons{
   display:flex;
@@ -291,7 +307,7 @@ body.dark .year-table th,body.dark .year-table td{
 .status-ok{color:#16A34A;}
 .status-warn{color:#F97316;}
 
-/* Category legend for doughnut charts */
+/* Category legend */
 .category-legend{
   display:flex;
   flex-wrap:wrap;

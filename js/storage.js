@@ -55,12 +55,24 @@ function normalizeCategoryName(name){
   return name.trim();
 }
 
+function getCategoryColorMap(){
+  const cats = loadCategories().slice().sort((a,b)=>a.localeCompare(b));
+  const map = {};
+  cats.forEach((cat,idx)=>{
+    map[cat] = CATEGORY_COLORS[idx % CATEGORY_COLORS.length];
+  });
+  return map;
+}
+function getCategoryColor(cat){
+  const map = getCategoryColorMap();
+  return map[cat] || CATEGORY_COLORS[0];
+}
+
 function addExpense(date, amount, category, note){
   let cats = loadCategories();
   let rawCat = normalizeCategoryName(category);
   if(!rawCat) rawCat = 'Uncategorized';
 
-  // Merge categories case-insensitively
   let canonical = rawCat;
   const idx = cats.findIndex(c => c.toLowerCase() === rawCat.toLowerCase());
   if(idx >= 0){

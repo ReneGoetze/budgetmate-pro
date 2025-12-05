@@ -132,9 +132,9 @@ function updateMonthSummary(monthExp, settings){
   let budget=null;
   if(settings.monthlyBudget) budget=Number(settings.monthlyBudget);
   else if(settings.dailyBudget) budget=Number(settings.dailyBudget)*daysCount;
-  let txt=`Sum: ${sum.toFixed(2)} € • Days: ${daysCount}`;
+  let txt='Sum: ' + sum.toFixed(2) + ' € • Days: ' + daysCount;
   if(budget!=null){
-    txt+=` • Budget: ${budget.toFixed(2)} €`;
+    txt+=' • Budget: ' + budget.toFixed(2) + ' €';
     if(sum<=budget){txt+=' • Under budget';el.className='hint summary-ok';}
     else{txt+=' • OVER budget';el.className='hint summary-warn';}
   }else el.className='hint';
@@ -164,9 +164,9 @@ function updateMonthChangeAndProjection(monthExp, settings){
       const diff=selSum-prevSum;
       const arrow=diff>0?'↑':(diff<0?'↓':'→');
       const abs=Math.abs(diff).toFixed(2);
-      if(diff>0){changeEl.textContent=`Change vs previous month: +${abs} € (${arrow})`;changeEl.className='hint summary-warn';}
-      else if(diff<0){changeEl.textContent=`Change vs previous month: -${abs} € (${arrow})`;changeEl.className='hint summary-ok';}
-      else{changeEl.textContent=`Change vs previous month: 0.00 € (${arrow})`;changeEl.className='hint';}
+      if(diff>0){changeEl.textContent='Change vs previous month: +' + abs + ' € ('+arrow+')';changeEl.className='hint summary-warn';}
+      else if(diff<0){changeEl.textContent='Change vs previous month: -' + abs + ' € ('+arrow+')';changeEl.className='hint summary-ok';}
+      else{changeEl.textContent='Change vs previous month: 0.00 € ('+arrow+')';changeEl.className='hint';}
     }
   }
 
@@ -187,10 +187,10 @@ function updateMonthChangeAndProjection(monthExp, settings){
         let limit=null;
         if(settings.monthlyBudget) limit=Number(settings.monthlyBudget);
         else if(settings.dailyBudget) limit=Number(settings.dailyBudget)*daysInMonth;
-        let txt=`Projected total for this month: ${projected.toFixed(2)} € (based on average daily spending)`;
+        let txt='Projected total for this month: ' + projected.toFixed(2) + ' € (based on average daily spending)';
         if(limit!=null){
-          if(projected<=limit){txt+=` • within budget (${limit.toFixed(2)} €)`;projEl.className='hint summary-ok';}
-          else{txt+=` • would OVER budget (${limit.toFixed(2)} €)`;projEl.className='hint summary-warn';}
+          if(projected<=limit){txt+=' • within budget ('+limit.toFixed(2)+' €)';projEl.className='hint summary-ok';}
+          else{txt+=' • would OVER budget ('+limit.toFixed(2)+' €)';projEl.className='hint summary-warn';}
         }else projEl.className='hint';
         projEl.textContent=txt;
       }
@@ -272,7 +272,6 @@ function renderCharts(){
   if(yearlyChart) yearlyChart.destroy();
   if(weeklyChart) weeklyChart.destroy();
 
-  // Monthly bar colors & cumulative for tooltip
   let barColors=m.values.map(()=>COLOR_NEUTRAL);
   if(s.dailyBudget){
     const db=Number(s.dailyBudget);
@@ -301,8 +300,8 @@ function renderCharts(){
               const val=ctx.parsed.y || 0;
               const cum=cumValues[ctx.dataIndex] || val;
               return [
-                `${dayLabel}. ${monthName} ${year}: ${val.toFixed(2)} €`,
-                `Cumulative: ${cum.toFixed(2)} €`
+                dayLabel + '. ' + monthName + ' ' + year + ': ' + val.toFixed(2) + ' €',
+                'Cumulative: ' + cum.toFixed(2) + ' €'
               ];
             }
           }
@@ -313,16 +312,9 @@ function renderCharts(){
     }
   });
 
-  // category colors per category (consistent)
-  const allCatsSet=new Set([...cMonth.labels,...cWeek.labels,...cDay.labels]);
-  const allCats=Array.from(allCatsSet).sort((a,b)=>a.localeCompare(b));
-  const colorByCat={};
-  allCats.forEach((cat,idx)=>{
-    colorByCat[cat]=CATEGORY_COLORS[idx % CATEGORY_COLORS.length];
-  });
-
+  const colorMap = getCategoryColorMap();
   function colorsFor(labels){
-    return labels.map(l=>colorByCat[l] || CATEGORY_COLORS[0]);
+    return labels.map(l=>colorMap[l] || CATEGORY_COLORS[0]);
   }
 
   catMonthChart=new Chart(cMonthCtx,{
@@ -341,15 +333,15 @@ function renderCharts(){
     options:{plugins:{legend:{display:false}}}
   });
 
-  // Render combined legend
   const legendDiv=document.getElementById('categoryLegend');
   if(legendDiv){
     legendDiv.innerHTML='';
-    allCats.forEach(cat=>{
-      const color=colorByCat[cat] || CATEGORY_COLORS[0];
+    const cats = loadCategories().slice().sort((a,b)=>a.localeCompare(b));
+    cats.forEach(cat=>{
+      const color=colorMap[cat] || CATEGORY_COLORS[0];
       const span=document.createElement('span');
       span.className='legend-item';
-      span.innerHTML=`<span class="legend-color" style="background:${color}"></span>${cat}`;
+      span.innerHTML='<span class="legend-color" style="background:'+color+'"></span>'+cat;
       legendDiv.appendChild(span);
     });
   }
@@ -362,10 +354,9 @@ function renderCharts(){
   let lineColor=COLOR_NEUTRAL;
   if(limit!=null) lineColor=cmTotal<=limit?COLOR_GREEN:COLOR_RED;
 
-  const tColor=lineColor;
   trendChart=new Chart(tCtx,{
     type:'line',
-    data:{labels:trend.labels,datasets:[{label:'Monthly Total (€)',data:trend.values,borderColor:tColor,backgroundColor:tColor,tension:0.2}]},
+    data:{labels:trend.labels,datasets:[{label:'Monthly Total (€)',data:trend.values,borderColor:lineColor,backgroundColor:lineColor,tension:0.2}]},
     options:{
       plugins:{legend:{display:false}},
       responsive:true,
@@ -390,9 +381,9 @@ function renderCharts(){
   const yearSumEl=document.getElementById('yearSummary');
   if(yearSumEl){
     yearSumEl.textContent=
-      `Year ${year}: Total ${yData.totalYear.toFixed(2)} € • Avg/month ${yData.avgMonth.toFixed(2)} € • `+
-      `Highest: ${yData.maxMonthLabel} (${yData.maxVal.toFixed(2)} €) • `+
-      `Lowest: ${yData.minMonthLabel} (${yData.minVal.toFixed(2)} €)`;
+      'Year ' + year + ': Total ' + yData.totalYear.toFixed(2) + ' € • Avg/month ' + yData.avgMonth.toFixed(2) +
+      ' € • Highest: ' + yData.maxMonthLabel + ' (' + yData.maxVal.toFixed(2) + ' €) • ' +
+      'Lowest: ' + yData.minMonthLabel + ' (' + yData.minVal.toFixed(2) + ' €)';
   }
   const yearTableEl=document.getElementById('yearTable');
   if(yearTableEl){
@@ -408,13 +399,13 @@ function renderCharts(){
         if(diff<=0){status='Under';cls='status-ok';}
         else{status='Over';cls='status-warn';}
       }
-      html+=`<tr>
-        <td>${label}</td>
-        <td>${sum.toFixed(2)}</td>
-        <td>${budget!=null?budget.toFixed(2):'-'}</td>
-        <td>${diff!=null?diff.toFixed(2):'-'}</td>
-        <td class="${cls}">${status}</td>
-      </tr>`;
+      html+='<tr>'+
+        '<td>'+label+'</td>'+
+        '<td>'+sum.toFixed(2)+'</td>'+
+        '<td>'+(budget!=null?budget.toFixed(2):'-')+'</td>'+
+        '<td>'+(diff!=null?diff.toFixed(2):'-')+'</td>'+
+        '<td class="'+cls+'">'+status+'</td>'+
+      '</tr>';
     }
     html+='</tbody></table>';
     yearTableEl.innerHTML=html;
@@ -433,9 +424,9 @@ function renderCharts(){
   const weekSummaryEl=document.getElementById('weekSummary');
   if(weekSummaryEl){
     weekSummaryEl.textContent=
-      `Last 12 weeks: Total ${wData.total.toFixed(2)} € • Avg/week ${wData.avgWeek.toFixed(2)} € • `+
-      `Best (lowest): ${wData.bestLabel} (${wData.bestVal.toFixed(2)} €) • `+
-      `Worst (highest): ${wData.worstLabel} (${wData.worstVal.toFixed(2)} €)`;
+      'Last 12 weeks: Total ' + wData.total.toFixed(2) + ' € • Avg/week ' + wData.avgWeek.toFixed(2) +
+      ' € • Best (lowest): ' + wData.bestLabel + ' (' + wData.bestVal.toFixed(2) +
+      ' €) • Worst (highest): ' + wData.worstLabel + ' (' + wData.worstVal.toFixed(2) + ' €)';
   }
 
   renderFavoriteCategories();

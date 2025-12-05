@@ -45,7 +45,7 @@ function handleNewRules(){
   alert('Rules have been reset logically. Please update your budget fields, categories or filters as needed.');
 }
 
-async function printReport(){
+async function captureFullPagePdf(filename){
   const container=document.querySelector('.container');
   if(!container) return;
   if(typeof html2canvas==='undefined' || typeof window.jspdf==='undefined'){
@@ -53,68 +53,43 @@ async function printReport(){
     return;
   }
   const {jsPDF}=window.jspdf;
-  const canvas=await html2canvas(container,{scale:2});
+  const canvas=await html2canvas(container,{scale:2, useCORS:true});
   const imgData=canvas.toDataURL('image/png');
   const pdf=new jsPDF('p','mm','a4');
   const pageWidth=210;
   const pageHeight=297;
-  const imgWidth=pageWidth-20;
-  const imgHeight=canvas.height*imgWidth/canvas.width;
-  let y=10;
-  if(imgHeight < pageHeight-20){
-    pdf.addImage(imgData,'PNG',10,y,imgWidth,imgHeight);
-  }else{
-    let remainingHeight=imgHeight;
-    let position=0;
-    while(remainingHeight>0){
-      pdf.addImage(imgData,'PNG',10,y,imgWidth,imgHeight,undefined,'FAST');
-      remainingHeight-=pageHeight;
-      position-=pageHeight;
-      if(remainingHeight>0) pdf.addPage();
-    }
+  const margin=10;
+  const availableWidth=pageWidth-2*margin;
+  const availableHeight=pageHeight-2*margin;
+  let imgWidth=availableWidth;
+  let imgHeight=canvas.height*imgWidth/canvas.width;
+  if(imgHeight>availableHeight){
+    const ratio=availableHeight/imgHeight;
+    imgWidth=imgWidth*ratio;
+    imgHeight=imgHeight*ratio;
   }
-  const filename='BudgetMate_full_'+new Date().toISOString().slice(0,10)+'.pdf';
+  const x=margin + (availableWidth-imgWidth)/2;
+  const y=margin + (availableHeight-imgHeight)/2;
+  pdf.addImage(imgData,'PNG',x,y,imgWidth,imgHeight);
   pdf.save(filename);
 }
 
+async function printReport(){
+  const dateStr=new Date().toISOString().slice(0,10);
+  await captureFullPagePdf('BudgetMate_full_'+dateStr+'.pdf');
+}
+
 async function exportMonthPdf(){
-  const container=document.querySelector('.container');
-  if(!container) return;
-  if(typeof html2canvas==='undefined' || typeof window.jspdf==='undefined'){
-    alert('PDF export is not available.');
-    return;
-  }
   const prevFilter=Object.assign({},currentFilter);
   currentFilter={period:'month',category:'all',from:null,to:null};
   renderExpenseTable();
   renderCharts();
   renderBudgetInfo();
 
-  const {jsPDF}=window.jspdf;
-  const canvas=await html2canvas(container,{scale:2});
-  const imgData=canvas.toDataURL('image/png');
-  const pdf=new jsPDF('p','mm','a4');
-  const pageWidth=210;
-  const pageHeight=297;
-  const imgWidth=pageWidth-20;
-  const imgHeight=canvas.height*imgWidth/canvas.width;
-  let y=10;
-  if(imgHeight < pageHeight-20){
-    pdf.addImage(imgData,'PNG',10,y,imgWidth,imgHeight);
-  }else{
-    let remainingHeight=imgHeight;
-    let position=0;
-    while(remainingHeight>0){
-      pdf.addImage(imgData,'PNG',10,y,imgWidth,imgHeight,undefined,'FAST');
-      remainingHeight-=pageHeight;
-      position-=pageHeight;
-      if(remainingHeight>0) pdf.addPage();
-    }
-  }
   const sel=getSelectedMonthDate();
   const fileMonth=MONTHS[sel.getMonth()];
   const filename='BudgetMate_month_'+fileMonth+'_'+sel.getFullYear()+'.pdf';
-  pdf.save(filename);
+  await captureFullPagePdf(filename);
 
   currentFilter=prevFilter;
   renderExpenseTable();
@@ -137,7 +112,7 @@ function exportCsv(){
       Number(e.amount||0).toFixed(2),
       (e.note||'').replace(/"/g,'""')
     ];
-    csv+=row.map(v=>`"${v}"`).join(';')+'\n';
+    csv+=row.map(v=>'"'+v+'"').join(';')+'\n';
   });
   const blob=new Blob([csv],{type:'text/csv;charset=utf-8;'});
   const url=URL.createObjectURL(blob);

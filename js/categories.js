@@ -21,12 +21,23 @@ function renderCategoryManager(){
     return;
   }
   cont.innerHTML = '';
+  const colorMap = getCategoryColorMap();
   cats.forEach(cat=>{
     const row = document.createElement('div');
     row.className = 'cat-item';
 
+    const left = document.createElement('div');
+    left.className = 'cat-item-left';
+
+    const dot = document.createElement('span');
+    dot.className = 'cat-color-dot';
+    dot.style.backgroundColor = colorMap[cat] || CATEGORY_COLORS[0];
+
     const span = document.createElement('span');
     span.textContent = cat;
+
+    left.appendChild(dot);
+    left.appendChild(span);
 
     const btns = document.createElement('div');
     btns.className = 'cat-item-buttons';
@@ -67,7 +78,7 @@ function renderCategoryManager(){
 
     btns.appendChild(renameBtn);
     btns.appendChild(delBtn);
-    row.appendChild(span);
+    row.appendChild(left);
     row.appendChild(btns);
     cont.appendChild(row);
   });
