@@ -1,11 +1,11 @@
 {
-  "name": "BudgetMate v21",
+  "name": "BudgetMate v21.1",
   "short_name": "BudgetMate",
   "start_url": "./",
   "display": "standalone",
   "background_color": "#0F172A",
   "theme_color": "#0F172A",
-  "description": "BudgetMate v21 - budgeting with monthly, yearly & weekly overviews",
+  "description": "BudgetMate v21.1 - budgeting with monthly, yearly & weekly overviews",
   "icons": [
     {
       "src": "./icons/icon-192.png",

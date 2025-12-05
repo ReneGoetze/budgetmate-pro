@@ -55,7 +55,7 @@ function restoreDarkModeAfterExport(wasDark){
   if(wasDark){document.body.classList.add('dark');updateDarkModeButtonLabel();}
 }
 
-// Mehrseitiger Screenshot der kompletten Seite
+// Mehrseitiger Screenshot: eine Seite pro Card (.header + .card)
 async function captureFullPagePdf(filename){
   const container=document.querySelector('.container');
   if(!container){
@@ -70,28 +70,35 @@ async function captureFullPagePdf(filename){
   const pdf=new jsPDF('p','mm','a4');
   const pageWidth=210,pageHeight=297,margin=10;
   const contentWidth=pageWidth-2*margin;
-  const canvas=await html2canvas(container,{scale:2,useCORS:true});
-  const imgWidth=contentWidth;
-  const pageHeightMm=pageHeight-2*margin;
-  const scale=imgWidth/canvas.width;
-  const pageHeightPx=pageHeightMm/scale;
-  let renderedHeight=0;
+  const cards=Array.from(container.querySelectorAll('.header, .card'));
+  if(!cards.length){
+    alert('Nothing to print.');
+    return;
+  }
   let pageIndex=0;
 
-  while(renderedHeight<canvas.height){
-    const pageCanvas=document.createElement('canvas');
-    pageCanvas.width=canvas.width;
-    pageCanvas.height=Math.min(pageHeightPx,canvas.height-renderedHeight);
-    const ctx=pageCanvas.getContext('2d');
-    ctx.drawImage(canvas,0,renderedHeight,canvas.width,pageCanvas.height,0,0,canvas.width,pageCanvas.height);
-    const imgData=pageCanvas.toDataURL('image/png');
-    if(pageIndex>0)pdf.addPage();
-    const imgHeight=pageCanvas.height*scale;
-    const x=margin;
-    const y=margin;
-    pdf.addImage(imgData,'PNG',x,y,imgWidth,imgHeight);
-    renderedHeight+=pageCanvas.height;
-    pageIndex++;
+  for(const card of cards){
+    const canvas=await html2canvas(card,{scale:2,useCORS:true});
+    const imgWidth=contentWidth;
+    const scale=imgWidth/canvas.width;
+    const pageHeightMm=pageHeight-2*margin;
+    const pageHeightPx=pageHeightMm/scale;
+    let renderedHeight=0;
+    while(renderedHeight<canvas.height){
+      const pageCanvas=document.createElement('canvas');
+      pageCanvas.width=canvas.width;
+      pageCanvas.height=Math.min(pageHeightPx,canvas.height-renderedHeight);
+      const ctx=pageCanvas.getContext('2d');
+      ctx.drawImage(canvas,0,renderedHeight,canvas.width,pageCanvas.height,0,0,canvas.width,pageCanvas.height);
+      const imgData=pageCanvas.toDataURL('image/png');
+      if(pageIndex>0||renderedHeight>0)pdf.addPage();
+      const imgHeight=pageCanvas.height*scale;
+      const x=margin;
+      const y=margin;
+      pdf.addImage(imgData,'PNG',x,y,imgWidth,imgHeight);
+      renderedHeight+=pageCanvas.height;
+      pageIndex++;
+    }
   }
   pdf.save(filename);
 }
